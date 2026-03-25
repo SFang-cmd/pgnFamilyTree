@@ -91,6 +91,17 @@ export function render(members, { onNodeClick } = {}) {
     if (mapped !== undefined) d.y = mapped;
   });
 
+  // Second pass (top-down): when a big and their little share the same
+  // graduation year they land on the same row.  D3 already places the big at
+  // the horizontal centre of its subtree, so in most cases they sit side by
+  // side naturally.  The only overlap case is when the big's sole child is that
+  // same-year little — in that situation shift the big one slot to the left.
+  currentRoot.eachBefore(d => {
+    if (d.parent && d.y === d.parent.y && d.parent.children?.length === 1) {
+      d.parent.x = d.x - (NODE_W + 6);
+    }
+  });
+
   // Initialise SVG and zoom behaviour.
   svg = d3.select("#tree-svg");
   svg.selectAll("*").remove();
