@@ -91,12 +91,35 @@ export function render(members, { onNodeClick } = {}) {
     if (mapped !== undefined) d.y = mapped;
   });
 
-  // Second pass (top-down): when a big and their little share the same
-  // graduation year, drop the little half a row lower so they're visually
-  // separated without jumping to the next full class-year row.
+  // Second pass (top-down): when a little's y is at or above their big's y
+  // (same class year, or a cascading chain of same-year bigs), drop them 50px
+  // below the big.  Using <= instead of === means the correction cascades:
+  // if A→B→C are all the same year, B is shifted first, then C is checked
+  // against the already-shifted B and shifted again.
   currentRoot.eachBefore(d => {
-    if (d.parent && d.y === d.parent.y) {
-      d.y = d.parent.y + ROW_H * 0.5;
+    if (d.parent && d.y <= d.parent.y) {
+      d.y = d.parent.y + 50;
+    }
+  });
+
+  // Third pass: the y-override can bring nodes from different tree depths onto
+  // the same row.  D3 only guarantees horizontal spacing between nodes at the
+  // same depth, so cross-branch overlaps can appear after we change y values.
+  // Group nodes by y level and do a left-to-right sweep, pushing any node that
+  // would overlap its left neighbour to the right.
+  const byLevel = new Map();
+  currentRoot.descendants().filter(d => d.id !== VROOT).forEach(d => {
+    const k = Math.round(d.y);
+    if (!byLevel.has(k)) byLevel.set(k, []);
+    byLevel.get(k).push(d);
+  });
+  const minSlot = NODE_W + 6;
+  byLevel.forEach(nodes => {
+    if (nodes.length < 2) return;
+    nodes.sort((a, b) => a.x - b.x);
+    for (let i = 1; i < nodes.length; i++) {
+      const minX = nodes[i - 1].x + minSlot;
+      if (nodes[i].x < minX) nodes[i].x = minX;
     }
   });
 
