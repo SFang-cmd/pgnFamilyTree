@@ -103,10 +103,10 @@ export function render(members, { onNodeClick } = {}) {
   });
 
   // Third pass: the y-override can bring nodes from different tree depths onto
-  // the same row.  D3 only guarantees horizontal spacing between nodes at the
-  // same depth, so cross-branch overlaps can appear after we change y values.
-  // Group nodes by y level and do a left-to-right sweep, pushing any node that
-  // would overlap its left neighbour to the right.
+  // the same row, creating overlaps D3 didn't plan for.  For each y level,
+  // sort nodes by their parent's x first (so siblings of the same parent stay
+  // grouped together and can't be split by nodes from an unrelated branch),
+  // then do a single left-to-right sweep to push apart any that are too close.
   const byLevel = new Map();
   currentRoot.descendants().filter(d => d.id !== VROOT).forEach(d => {
     const k = Math.round(d.y);
@@ -116,7 +116,11 @@ export function render(members, { onNodeClick } = {}) {
   const minSlot = NODE_W + 6;
   byLevel.forEach(nodes => {
     if (nodes.length < 2) return;
-    nodes.sort((a, b) => a.x - b.x);
+    nodes.sort((a, b) => {
+      const pa = a.parent ? a.parent.x : a.x;
+      const pb = b.parent ? b.parent.x : b.x;
+      return pa !== pb ? pa - pb : a.x - b.x;
+    });
     for (let i = 1; i < nodes.length; i++) {
       const minX = nodes[i - 1].x + minSlot;
       if (nodes[i].x < minX) nodes[i].x = minX;
