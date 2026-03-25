@@ -92,7 +92,7 @@ export const LIN_COLORS = {
 export const VROOT = "__pgn_root__";
 
 /** Width of each node rectangle in SVG units (pixels at 1× zoom). */
-export const NODE_W = 150;
+export const NODE_W = 105;
 
 /** Height of each node rectangle in SVG units. */
-export const NODE_H = 48;
+export const NODE_H = 46;

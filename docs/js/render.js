@@ -70,7 +70,7 @@ export function render(members, { onNodeClick } = {}) {
     .parentId(d => d._parent)(nodes);
 
   // Apply tree layout — nodeSize gives uniform spacing regardless of tree width.
-  d3.tree().nodeSize([NODE_W + 10, NODE_H + 52])(currentRoot);
+  d3.tree().nodeSize([NODE_W + 6, NODE_H + 52])(currentRoot);
 
   // Override each node's y-coordinate so members of the same graduation year
   // land on the same horizontal row.  Nodes without a class_year (placeholder
@@ -131,7 +131,7 @@ export function render(members, { onNodeClick } = {}) {
     .attr("dy",          d => d.data.pledge_class ? "-5" : "4")
     .attr("font-size",   14)
     .attr("font-weight", 600)
-    .text(d => clip(d.data.name, 20));
+    .text(d => clip(d.data.name, 14));
 
   // Pledge class subtitle in smaller text below the name.
   nd.append("text")
@@ -180,8 +180,8 @@ export function render(members, { onNodeClick } = {}) {
 /**
  * Animate the viewport so the entire tree fits within the container.
  *
- * Scales down if the tree is larger than the container, but never scales
- * above 1× so individual nodes remain readable.
+ * Scales to fit the tree within the container, clamped between 0.25× and 1×.
+ * At 0.25× the tree structure is visible; users can zoom out further manually.
  */
 export function fitTree() {
   if (!currentRoot) return;
@@ -193,9 +193,13 @@ export function fitTree() {
   const x0   = Math.min(...xs) - NODE_W / 2, x1 = Math.max(...xs) + NODE_W / 2;
   const y0   = Math.min(...ys) - NODE_H / 2, y1 = Math.max(...ys) + NODE_H / 2;
 
-  const scale = Math.min(1, Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.88);
-  const tx    = W / 2 - ((x0 + x1) / 2) * scale;
-  const ty    = 24 - y0 * scale;
+  // Fit to screen but never shrink below 0.25 — at that scale 14px font is
+  // still ~3.5px, which is enough to see the tree structure.  Users can zoom
+  // out further manually if they need the full picture.
+  const fitScale = Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.88;
+  const scale    = Math.max(0.25, Math.min(1, fitScale));
+  const tx       = W / 2 - ((x0 + x1) / 2) * scale;
+  const ty       = 24 - y0 * scale;
 
   svg.transition().duration(350)
     .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
