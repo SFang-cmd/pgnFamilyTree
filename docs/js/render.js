@@ -70,7 +70,26 @@ export function render(members, { onNodeClick } = {}) {
     .parentId(d => d._parent)(nodes);
 
   // Apply tree layout — nodeSize gives uniform spacing regardless of tree width.
-  d3.tree().nodeSize([NODE_W + 18, NODE_H + 52])(currentRoot);
+  d3.tree().nodeSize([NODE_W + 10, NODE_H + 52])(currentRoot);
+
+  // Override each node's y-coordinate so members of the same graduation year
+  // land on the same horizontal row.  Nodes without a class_year (placeholder
+  // members whose data is incomplete) keep the depth-based y from d3.tree().
+  const ROW_H = 90; // vertical pixels between consecutive class years
+  const years = [...new Set(
+    currentRoot.descendants()
+      .map(d => d.data.class_year)
+      .filter(y => y && y !== "-")
+      .map(y => parseInt(y, 10))
+      .filter(y => !isNaN(y))
+  )].sort((a, b) => a - b);
+
+  const yearToY = new Map(years.map((y, i) => [String(y), i * ROW_H]));
+
+  currentRoot.descendants().forEach(d => {
+    const mapped = yearToY.get(d.data.class_year);
+    if (mapped !== undefined) d.y = mapped;
+  });
 
   // Initialise SVG and zoom behaviour.
   svg = d3.select("#tree-svg");
@@ -110,7 +129,7 @@ export function render(members, { onNodeClick } = {}) {
   nd.append("text")
     .attr("text-anchor", "middle")
     .attr("dy",          d => d.data.pledge_class ? "-5" : "4")
-    .attr("font-size",   12)
+    .attr("font-size",   14)
     .attr("font-weight", 600)
     .text(d => clip(d.data.name, 20));
 
@@ -118,7 +137,7 @@ export function render(members, { onNodeClick } = {}) {
   nd.append("text")
     .attr("text-anchor", "middle")
     .attr("dy",         "11")
-    .attr("font-size",  10)
+    .attr("font-size",  11)
     .attr("fill",       "#666")
     .text(d => d.data.pledge_class || "");
 
