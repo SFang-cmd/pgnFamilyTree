@@ -92,13 +92,11 @@ export function render(members, { onNodeClick } = {}) {
   });
 
   // Second pass (top-down): when a big and their little share the same
-  // graduation year they land on the same row.  D3 already places the big at
-  // the horizontal centre of its subtree, so in most cases they sit side by
-  // side naturally.  The only overlap case is when the big's sole child is that
-  // same-year little — in that situation shift the big one slot to the left.
+  // graduation year, drop the little half a row lower so they're visually
+  // separated without jumping to the next full class-year row.
   currentRoot.eachBefore(d => {
-    if (d.parent && d.y === d.parent.y && d.parent.children?.length === 1) {
-      d.parent.x = d.x - (NODE_W + 6);
+    if (d.parent && d.y === d.parent.y) {
+      d.y = d.parent.y + ROW_H * 0.5;
     }
   });
 
