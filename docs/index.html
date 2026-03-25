@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PGN Family Tree</title>
+  <!-- D3 must be loaded before ES modules so it is available as a global. -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="header">
+  <h1>PGN Family Tree</h1>
+  <span id="member-count"></span>
+</div>
+
+<div id="controls">
+  <label>Search <input type="text" id="search" placeholder="Member name…" autocomplete="off"></label>
+  <label>Lin <select id="lin-filter"><option value="">All lins</option></select></label>
+  <label><input type="checkbox" id="color-toggle" checked> Color by lin</label>
+  <button id="fit-btn">Fit to screen</button>
+</div>
+
+<div id="tree-container">
+  <div id="loading-screen" class="screen">Loading family tree data…</div>
+
+  <div id="setup-screen" class="screen">
+    <div class="card">
+      <h2>Setup Required</h2>
+      <ol>
+        <li>Open (or create) your Google Sheet with columns:<br>
+          <code>name</code>, <code>big</code>, <code>lin</code>, <code>pledge_class</code>, <code>class_year</code></li>
+        <li>Go to <strong>File → Share → Publish to web</strong></li>
+        <li>Choose your sheet tab, set format to <strong>Comma-separated values (.csv)</strong>, click <strong>Publish</strong></li>
+        <li>Copy the published URL</li>
+        <li>Open <code>docs/js/config.js</code>, find <code>SHEET_URL</code> near the top, and replace the placeholder with your URL</li>
+        <li>Push to GitHub and enable Pages under <strong>Settings → Pages</strong>, source: <strong>docs/ folder, main branch</strong></li>
+      </ol>
+      <p class="note">
+        The sheet is fetched live on every page load — no rebuild needed when data changes.<br>
+        Make sure the sheet is shared as "Anyone with the link can view".
+      </p>
+    </div>
+  </div>
+
+  <div id="error-screen" class="screen">
+    <div class="card">
+      <h2>Could not load data</h2>
+      <p id="error-msg"></p>
+      <ul style="margin-top:12px">
+        <li>Confirm the Google Sheet is published (<strong>File → Share → Publish to web</strong>)</li>
+        <li>Confirm the sheet is shared as "Anyone with the link can view"</li>
+        <li>Check the <code>SHEET_URL</code> value in <code>docs/js/config.js</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <svg id="tree-svg"></svg>
+
+  <div id="legend">
+    <h4>Lin Legend</h4>
+    <div id="legend-items"></div>
+  </div>
+
+  <div id="info-panel">
+    <button id="info-close">&times;</button>
+    <div id="info-content"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!--
+  Entry point. type="module" enables ES module imports across all js/ files.
+  D3 is loaded above as a plain <script> so it remains a global (d3.*) that
+  all modules can reference without bundling.
+-->
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
