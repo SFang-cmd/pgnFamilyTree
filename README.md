@@ -1,6 +1,6 @@
 # PGN Family Tree
 
-An interactive big/little family tree for Penn Gamma Nu.  Member data lives in a Google Sheet and is fetched live on every page load — no rebuild required when the sheet changes.  The tree is deployed on GitHub Pages and rendered with D3.js.
+An interactive big/little family tree for Penn Gamma Nu. Member data lives in a Google Sheet and is fetched live on every page load — no rebuild required when the sheet changes. The tree is deployed on GitHub Pages and rendered with D3.js + Dagre.
 
 ---
 
@@ -11,13 +11,18 @@ An interactive big/little family tree for Penn Gamma Nu.  Member data lives in a
 3. [Configuration Reference](#configuration-reference)
 4. [Data Format](#data-format)
 5. [Adding New Fields to the Info Panel](#adding-new-fields-to-the-info-panel)
-6. [Deployment Guide](#deployment-guide)
+6. [JavaScript Architecture](#javascript-architecture)
+   - [Module Map](#module-map)
+   - [Data Flow](#data-flow)
+   - [Layout System](#layout-system)
+   - [Adding a New Layout Mode](#adding-a-new-layout-mode)
+7. [Deployment Guide](#deployment-guide)
    - [Google Sheets Setup](#google-sheets-setup)
    - [GitHub Pages](#github-pages)
    - [GitHub Actions (automated updates)](#github-actions-automated-updates)
-7. [Local Development](#local-development)
-8. [Python Pipeline (optional)](#python-pipeline-optional)
-9. [Research Notes](#research-notes)
+8. [Local Development](#local-development)
+9. [Python Pipeline (optional)](#python-pipeline-optional)
+10. [Research Notes](#research-notes)
 
 ---
 
@@ -27,9 +32,9 @@ The web app (`docs/`) is a zero-build, vanilla JS site that:
 
 - Fetches a published Google Sheets CSV URL on every page load
 - Parses the CSV in-browser and propagates lin values top-down through the family tree
-- Renders the result as a zoomable/pannable D3 tree
+- Renders the result as a zoomable/pannable D3 tree using Dagre for layout
 - Shows a slide-in info panel when you click a node, with copy buttons for contact fields
-- Supports search, lin filter, and color-by-lin toggle
+- Supports search, lin filter, color-by-lin toggle, and layout mode switching
 
 The Python pipeline (`src/`, `main.py`, `lin_processing.py`) can optionally generate static PNG and DOT exports of the same tree.
 
@@ -56,7 +61,7 @@ pgnFamilyTree/
 │       ├── config.js               # ** EDIT THIS ** — SHEET_URL, colors, fields
 │       ├── csv.js                  # CSV parsing utilities
 │       ├── tree.js                 # Builds flat node list for D3
-│       ├── render.js               # D3 tree rendering, zoom/pan
+│       ├── render.js               # D3 tree rendering, zoom/pan, layout engine
 │       ├── panel.js                # Click info panel
 │       ├── controls.js             # UI control event listeners
 │       └── main.js                 # Entry point — fetch, parse, render
@@ -91,7 +96,7 @@ pgnFamilyTree/
 | `SHEET_URL` | Published CSV URL from Google Sheets. Replace the placeholder with your URL. |
 | `PANEL_FIELDS` | Array of `{ key, label, copy }` objects controlling what the info panel shows. |
 | `LIN_COLORS` | Maps lin name → pastel hex colour. Add a new entry when a new lin is created. |
-| `VROOT` | Internal constant — do not change. |
+| `VROOT` | Internal constant used as the hidden virtual root id — do not change. |
 | `NODE_W` / `NODE_H` | Width/height of each node rectangle in SVG pixels. |
 
 ---
@@ -106,7 +111,7 @@ The Google Sheet must have these columns (header names are case-insensitive; spa
 | `big` | No | Big's name exactly as it appears in the `name` column |
 | `lin` | No | Lin name (e.g. `watergates`). Only needed for lin heads — propagates to descendants automatically |
 | `pledge_class` | No | E.g. `Alpha Beta`. Shown as a subtitle on the node. |
-| `class_year` | No | Graduation year |
+| `class_year` | No | Graduation year (4-digit integer) |
 | `email` | No | Shown in info panel with a copy button |
 
 Extra columns are ignored unless you add them to `PANEL_FIELDS` in `config.js`.
@@ -128,6 +133,103 @@ Extra columns are ignored unless you add them to `PANEL_FIELDS` in `config.js`.
 
 `copy: true` renders a clipboard button next to the value.
 `copy: false` shows the value as plain text with no button.
+
+---
+
+## JavaScript Architecture
+
+### Module Map
+
+All JS files use ES modules (`import`/`export`). They load in this dependency order:
+
+```text
+index.html
+└── main.js          ← entry point
+    ├── config.js    ← constants (no dependencies)
+    ├── csv.js       ← CSV parsing (no dependencies)
+    ├── tree.js      ← node list builder (imports config.js)
+    ├── render.js    ← D3 rendering + layout engine (imports config.js, tree.js)
+    ├── panel.js     ← info panel (imports config.js, render.js)
+    └── controls.js  ← UI wiring (imports render.js, panel.js)
+```
+
+**`main.js`** — Fetches the CSV, calls `parseCSV` → `render` → `setupControls`. Shows loading/error/setup screens. Contains no rendering or parsing logic.
+
+**`csv.js`** — Parses the raw CSV text into an array of plain objects. Normalises header names (lowercase, spaces → underscores).
+
+**`tree.js`** — Converts the flat member array into a node list for `d3.stratify()`. Creates placeholder nodes for any referenced bigs not in the data, propagates lin values top-down, and attaches every root node to the hidden virtual root (`VROOT`).
+
+**`render.js`** — Owns all mutable rendering state (`svg`, `g`, `zoom`, `currentRoot`, `layoutMode`, `_edgeWaypoints`). Exports the public API: `render()`, `fitTree()`, `focusNode()`, `setLayoutMode()`, `setColorOn()`, `getColorOn()`, `fillColor()`, `borderColor()`, `clip()`.
+
+**`panel.js`** — Manages the slide-in info panel. Exports `openPanel(d)` and `closePanel()`. Renders fields from `PANEL_FIELDS`, copy-to-clipboard buttons, and a clickable list of littles that calls `focusNode()`.
+
+**`controls.js`** — Attaches all DOM event listeners after the tree renders. Exports `setupControls()`. Handles: search highlight/dim, lin filter dropdown, layout mode dropdown, color-by-lin checkbox, fit-to-screen button, and panel-close gestures (× button, SVG background click, Escape key).
+
+### Data Flow
+
+```text
+Google Sheets CSV
+  → fetch() in main.js
+  → parseCSV()           (csv.js)    plain object array
+  → buildNodes()         (tree.js)   flat node list + VROOT
+  → d3.stratify()        (render.js) D3 hierarchy
+  → _computeLayout()     (render.js) sets d.x / d.y on every node
+  → D3 join (links, nodes, text, tooltips)
+  → fitTree()
+```
+
+### Layout System
+
+The layout is computed in `_computeLayout(root)` inside `render.js`. The active mode is stored in the module-level `layoutMode` variable and changed via `setLayoutMode(mode)`, which re-runs the layout and animates nodes and links to their new positions.
+
+#### Layout modes
+
+| Mode | Behaviour |
+| ---- | --------- |
+| `"none"` | Pure Dagre. Both x and y come directly from Dagre's Sugiyama algorithm. Clean lines, no row alignment. |
+| `"class_year"` | Dagre for x (crossing-minimised); y overridden by graduation year so every class year occupies the same horizontal row. See details below. |
+| `"pledge_class"` | **Not yet implemented** — the dropdown option exists but the mode falls through to `"none"` behaviour. Implement by analogy with `"class_year"` using `d.data.pledge_class` as the grouping key. |
+
+#### `"class_year"` layout — how it works
+
+A naïve approach (run Dagre, then snap y to class year rows) breaks Dagre's x layout because Dagre computed x positions for its own internal ranks, not for the overridden y values. Same-year big/little pairs would land at fractional y offsets that Dagre never accounted for, causing micro-overlaps.
+
+The solution uses a **doubled-rank** strategy:
+
+1. **Pre-assign visual ranks** (top-down traversal):
+   - VROOT gets rank 0.
+   - Each class year gets an even rank: earliest year → 2, next → 4, etc. (one increment of 2 per year).
+   - If a node's even rank ≤ its parent's visual rank (same-year big/little), it is assigned `parent_rank + 1` (the odd slot between the two adjacent even ranks).
+   - All y values are then exact multiples of `RANK_H = 60px`, with no fractions.
+
+2. **Build the Dagre graph with VROOT included:**
+   - VROOT is added as a node so all disconnected lin families share one connected graph. This gives Dagre a global rank reference across all lins.
+   - VROOT → lin-head edges use Dagre's `minlen` property (set to the lin-head's visual rank) to enforce the correct global rank without adding dummy nodes on those edges.
+   - For edges between real members that span more than one rank, invisible **dummy nodes** are inserted (one per skipped rank) so Dagre's crossing-minimisation algorithm treats every edge as a single-rank hop.
+
+3. **Run Dagre once.** Extract x from Dagre for all real nodes. Set y from the pre-assigned visual rank (`visualRank * RANK_H`).
+
+4. **Compute waypoints** for multi-rank edges: x comes from the Dagre dummy node positions (which are crossing-minimised); y is linearly interpolated between the source and target's final y values. Waypoints are stored in `_edgeWaypoints` (a `Map<"srcId::tgtId", [{x,y}]>`).
+
+5. **Draw edges** via `_linkPath(l)`: edges with waypoints use `d3.line().curve(d3.curveMonotoneY)`; edges without waypoints use `d3.linkVertical()`.
+
+#### Key constants (in `_computeLayout`)
+
+| Constant | Value | Meaning |
+| -------- | ----- | ------- |
+| `RANK_H` | `60` | Pixels per rank unit. Two rank units = one class-year gap = 120 px. |
+| `nodesep` | `20` | Dagre: minimum horizontal gap between node edges in the same rank. |
+| `ranksep` | `80` | Dagre: vertical gap between ranks in `"none"` mode (Dagre controls y). |
+
+### Adding a New Layout Mode
+
+1. Add an `<option>` to `#layout-mode` in `index.html`.
+2. Add the mode string as a case in `_computeLayout` in `render.js`. Follow the `"class_year"` block as a template:
+   - Pre-assign visual ranks using whichever grouping field you want.
+   - Build the Dagre graph and run `dagre.layout(dg)`.
+   - Set `d.x` and `d.y` on every node.
+   - Optionally populate `_edgeWaypoints` for multi-rank edge routing.
+3. No changes needed in `controls.js` — the dropdown change handler already calls `setLayoutMode(value)` generically.
 
 ---
 
@@ -186,6 +288,8 @@ For development without a live sheet, you can temporarily point `SHEET_URL` at a
 ```js
 export const SHEET_URL = "http://localhost:8000/data/alumni-year-pc.csv";
 ```
+
+**Browser caching:** ES modules are aggressively cached. If code changes are not appearing, do a hard reload (`Cmd+Shift+R` on Mac) or open DevTools → Network tab → enable "Disable cache" before reloading.
 
 ---
 
