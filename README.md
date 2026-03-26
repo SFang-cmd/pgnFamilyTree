@@ -103,18 +103,27 @@ pgnFamilyTree/
 
 ## Data Format
 
-The Google Sheet must have these columns (header names are case-insensitive; spaces become underscores):
+The Google Sheet must have these columns. Header names are **case-insensitive**; spaces are converted to underscores and hyphens are preserved when generating JS property keys.
 
-| Column | Required | Description |
-| ------ | -------- | ----------- |
-| `name` | Yes | Full name, unique per member |
-| `big` | No | Big's name exactly as it appears in the `name` column |
-| `lin` | No | Lin name (e.g. `watergates`). Only needed for lin heads — propagates to descendants automatically |
-| `pledge_class` | No | E.g. `Alpha Beta`. Shown as a subtitle on the node. |
-| `class_year` | No | Graduation year (4-digit integer) |
-| `email` | No | Shown in info panel with a copy button |
+| Sheet header | JS key | Required | Description |
+| ------------ | ------ | -------- | ----------- |
+| `name` | `name` | Yes | Full name, unique per member |
+| `big` | `big` | No | Big's name exactly as it appears in the `name` column |
+| `lin` | `lin` | No | Lin name (e.g. `watergates`). Only needed for lin heads — propagates to descendants automatically |
+| `pledge_class` | `pledge_class` | No | E.g. `Alpha Beta`. Shown as a subtitle on the node. |
+| `class_year` | `class_year` | No | Graduation year (4-digit integer) |
+| `Non-Penn Email` | `non-penn_email` | No | Personal email, shown with a copy button |
+| `Phone Number` | `phone_number` | No | Phone number, shown with a copy button |
+| `LinkedIn` | `linkedin` | No | LinkedIn URL, rendered as a clickable link with a copy button |
+| `Industry` | `industry` | No | Comma-separated list of industries (e.g. `Finance, Tech`). Each value becomes a separate option in the Industry filter. |
+| `Current Company` | `current_company` | No | Current employer |
+| `Role` | `role` | No | Current job title |
+| `Past Companies` | `past_companies` | No | Previous employers |
+| `Location` | `location` | No | City / region |
 
 Extra columns are ignored unless you add them to `PANEL_FIELDS` in `config.js`.
+
+> **Note on multi-line cell values:** Google Sheets may export quoted fields that contain embedded newlines (e.g. a role entered with a line break). The CSV parser handles these correctly — they are collapsed to a single space rather than splitting the row into two members.
 
 **Lin propagation rule:** If a member has an explicit `lin` value, that lin is applied to them and all their descendants. If a descendant also has an explicit `lin`, that overrides the inherited value for their subtree. Members with no lin ancestor default to `pgn` (grey).
 
@@ -122,17 +131,19 @@ Extra columns are ignored unless you add them to `PANEL_FIELDS` in `config.js`.
 
 ## Adding New Fields to the Info Panel
 
-1. Add the column to the Google Sheet (e.g. `Phone`).
+1. Add the column to the Google Sheet with your chosen header name.
 2. In `docs/js/config.js`, add one entry to `PANEL_FIELDS`:
 
    ```js
-   { key: "phone", label: "Phone", copy: true }
+   { key: "phone_number", label: "Phone", copy: true }
    ```
 
 3. Push. No other code changes needed.
 
-`copy: true` renders a clipboard button next to the value.
-`copy: false` shows the value as plain text with no button.
+| Property | Values | Effect |
+| -------- | ------ | ------ |
+| `copy` | `true` / `false` | Renders a copy-to-clipboard button next to the value |
+| `link` | `true` / `false` | Renders the value as a clickable `<a>` link (useful for LinkedIn URLs). If the value doesn't start with `http`, `https://` is prepended automatically. |
 
 ---
 
@@ -155,15 +166,30 @@ index.html
 
 **`main.js`** — Fetches the CSV, calls `parseCSV` → `render` → `setupControls`. Shows loading/error/setup screens. Contains no rendering or parsing logic.
 
-**`csv.js`** — Parses the raw CSV text into an array of plain objects. Normalises header names (lowercase, spaces → underscores).
+**`csv.js`** — Parses the raw CSV text into an array of plain objects. Normalises header names (lowercase, spaces → underscores, hyphens preserved). Uses a record-aware splitter (`_splitRecords`) that correctly handles quoted fields containing embedded newlines before splitting into individual fields — this prevents multi-line cell values (e.g. a role entered with a line break in Google Sheets) from being treated as separate members.
 
 **`tree.js`** — Converts the flat member array into a node list for `d3.stratify()`. Creates placeholder nodes for any referenced bigs not in the data, propagates lin values top-down, and attaches every root node to the hidden virtual root (`VROOT`).
 
-**`render.js`** — Owns all mutable rendering state (`svg`, `g`, `zoom`, `currentRoot`, `layoutMode`, `_edgeWaypoints`). Exports the public API: `render()`, `fitTree()`, `focusNode()`, `setLayoutMode()`, `setColorOn()`, `getColorOn()`, `fillColor()`, `borderColor()`, `clip()`.
+**`render.js`** — Owns all mutable rendering state (`svg`, `g`, `zoom`, `currentRoot`, `layoutMode`, `_edgeWaypoints`, `_rowYears`, `_labelsG`). Exports the public API: `render()`, `fitTree()`, `focusNode()`, `setLayoutMode()`, `setColorOn()`, `getColorOn()`, `fillColor()`, `borderColor()`, `clip()`. Also populates the lin, industry, company, and location filter dropdowns during `render()`.
 
-**`panel.js`** — Manages the slide-in info panel. Exports `openPanel(d)` and `closePanel()`. Renders fields from `PANEL_FIELDS`, copy-to-clipboard buttons, and a clickable list of littles that calls `focusNode()`.
+In `"class_year"` layout mode, `render()` also calls `_updateRowUnderlays()` which draws faint horizontal lines behind each year's row (inside `g`, so they zoom/pan with the tree) and year labels pinned to the left edge of the SVG viewport (in a separate `_labelsG` group outside `g`). Label y-positions are updated on every zoom event using `d.y * transform.k + transform.y`.
 
-**`controls.js`** — Attaches all DOM event listeners after the tree renders. Exports `setupControls()`. Handles: search highlight/dim, lin filter dropdown, layout mode dropdown, color-by-lin checkbox, fit-to-screen button, and panel-close gestures (× button, SVG background click, Escape key).
+**`panel.js`** — Manages the slide-in info panel. Exports `openPanel(d)` and `closePanel()`. Renders fields from `PANEL_FIELDS`, copy-to-clipboard buttons, clickable links (for fields with `link: true`), and a clickable list of littles that calls `focusNode()`.
+
+**`controls.js`** — Attaches all DOM event listeners after the tree renders. Exports `setupControls()`. All active filters are ANDed together in a single `_applyFilters()` function so they never overwrite each other.
+
+| Control | Element | Behaviour |
+| ------- | ------- | --------- |
+| Name search | `#search` | Highlights matching nodes, dims the rest |
+| Lin filter | `#lin-filter` | Dims nodes not in the selected lin |
+| Industry filter | `#industry-select` (custom tag-select) | Multi-select; dims nodes that don't match any selected industry. Industry values in the data are comma-separated and split into individual options. |
+| Company filter | `#company-filter` | Dims nodes not at the selected company |
+| Location filter | `#location-filter` | Dims nodes not in the selected location |
+| Has Email checkbox | `#has-email` | Dims nodes with no email |
+| Has LinkedIn checkbox | `#has-linkedin` | Dims nodes with no LinkedIn |
+| Layout mode | `#layout-mode` | Switches between `"none"` and `"class_year"` |
+| Color by lin | `#color-toggle` | Toggles lin fill colours |
+| Fit to screen | `#fit-btn` | Calls `fitTree()` |
 
 ### Data Flow
 

@@ -1,6 +1,7 @@
 /* =============================================================================
    styles.css
    PGN Family Tree — main stylesheet
+   Color palette: Cardinal (#8C1D2E) and Gold (#C8943A) — Phi Gamma Nu colors
    Imported by docs/index.html via <link>.
    ============================================================================= */
 
@@ -14,26 +15,27 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;  /* prevent body scroll — the tree container scrolls instead */
+  overflow: hidden;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────────── */
 #header {
-  background: #1a1a2e;
+  background: #8C1D2E;
   color: white;
   padding: 12px 20px;
   display: flex;
   align-items: center;
   gap: 14px;
   flex-shrink: 0;
+  border-bottom: 3px solid #C8943A;
 }
 #header h1      { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.3px; }
-#member-count   { font-size: 0.78rem; opacity: 0.55; }
+#member-count   { font-size: 0.78rem; opacity: 0.65; }
 
 /* ── Control bar ────────────────────────────────────────────────────────────── */
 #controls {
   background: white;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 2px solid #e8d0a0;
   padding: 9px 20px;
   display: flex;
   gap: 14px;
@@ -56,44 +58,7 @@ input[type="text"], select {
   outline: none;
   background: white;
 }
-input[type="text"]:focus, select:focus { border-color: #555; }
-
-/* ── Industry tag multi-select ──────────────────────────────────────────────── */
-.tag-select         { position: relative; display: inline-block; }
-.tag-select-trigger {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
-  border: 1px solid #ccc; border-radius: 5px; padding: 3px 8px;
-  min-width: 130px; max-width: 280px; min-height: 28px;
-  cursor: pointer; background: white; font-size: 0.8rem;
-}
-.tag-select-trigger:focus-within { border-color: #555; }
-.tag-select-tags    { display: contents; }
-.tag-select-placeholder { color: #999; font-size: 0.8rem; }
-.tag-select-arrow   { margin-left: auto; color: #aaa; font-size: 0.65rem; padding-left: 4px; flex-shrink: 0; }
-.tag-select-tag {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: #e8f0fe; border-radius: 3px;
-  padding: 1px 5px; font-size: 0.75rem; color: #1a3a6e; white-space: nowrap;
-}
-.tag-remove {
-  background: none; border: none; cursor: pointer;
-  color: #7a9acc; font-size: 0.9rem; padding: 0; line-height: 1;
-}
-.tag-remove:hover { color: #e74c3c; background: none; }
-.tag-select-dropdown {
-  display: none; position: absolute; top: calc(100% + 4px); left: 0;
-  min-width: 100%; max-height: 220px; overflow-y: auto;
-  background: white; border: 1px solid #ccc; border-radius: 5px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 500;
-}
-.tag-select-dropdown.open { display: block; }
-.tag-select-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 12px; cursor: pointer; font-size: 0.8rem; color: #333;
-  white-space: nowrap; user-select: none;
-}
-.tag-select-item:hover { background: #f5f5f5; }
-.tag-select-item input[type="checkbox"] { cursor: pointer; margin: 0; flex-shrink: 0; }
+input[type="text"]:focus, select:focus { border-color: #8C1D2E; }
 #search { width: 180px; }
 
 button {
@@ -105,7 +70,7 @@ button {
   cursor: pointer;
   color: #444;
 }
-button:hover { background: #f0f0f0; }
+button:hover { background: #FEF3E2; border-color: #C8943A; color: #6B0F1F; }
 
 /* ── Tree viewport ──────────────────────────────────────────────────────────── */
 #tree-container { flex: 1; position: relative; overflow: hidden; }
@@ -115,21 +80,23 @@ button:hover { background: #f0f0f0; }
 .link                      { fill: none; stroke: #c8c8c8; stroke-width: 1.5; }
 .node rect                 { cursor: pointer; transition: opacity 0.15s; }
 .node text                 { pointer-events: none; }
-.node.highlighted rect     { stroke: #e74c3c !important; stroke-width: 2.5 !important; }
+.node.highlighted rect     { stroke: #8C1D2E !important; stroke-width: 2.5 !important; }
 .node.dimmed               { opacity: 0.12; }
 
 /* ── Class-year row underlays ───────────────────────────────────────────────── */
 .row-line {
-  stroke: #e8e8e8;
+  stroke: #ebebeb;
   stroke-width: 1;
   pointer-events: none;
 }
 .row-label {
   font-size: 11px;
-  fill: #bbb;
+  fill: #C8943A;
   dominant-baseline: middle;
   pointer-events: none;
   user-select: none;
+  font-weight: 600;
+  opacity: 0.7;
 }
 
 /* ── Hover tooltip ──────────────────────────────────────────────────────────── */
@@ -153,7 +120,8 @@ button:hover { background: #f0f0f0; }
   bottom: 16px;
   right: 16px;
   background: white;
-  border: 1px solid #ddd;
+  border: 1px solid #e8d0a0;
+  border-top: 3px solid #C8943A;
   border-radius: 8px;
   padding: 11px 14px;
   font-size: 12px;
@@ -166,7 +134,7 @@ button:hover { background: #f0f0f0; }
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #999;
+  color: #8C1D2E;
   margin-bottom: 8px;
 }
 .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; white-space: nowrap; }
@@ -179,16 +147,16 @@ button:hover { background: #f0f0f0; }
   width: 280px;
   height: 100%;
   background: white;
-  border-left: 1px solid #e0e0e0;
+  border-left: 1px solid #e8d0a0;
   box-shadow: -4px 0 18px rgba(0,0,0,0.07);
-  transform: translateX(100%);         /* hidden off-screen by default */
+  transform: translateX(100%);
   transition: transform 0.22s ease;
   z-index: 200;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-#info-panel.open { transform: translateX(0); }  /* slide in when .open is added */
+#info-panel.open { transform: translateX(0); }
 
 #info-close {
   position: absolute;
@@ -202,7 +170,7 @@ button:hover { background: #f0f0f0; }
   line-height: 1;
   border-radius: 4px;
 }
-#info-close:hover { color: #333; background: #f0f0f0; }
+#info-close:hover { color: #8C1D2E; background: #FEF3E2; }
 
 #info-content {
   padding: 20px 18px 24px;
@@ -215,8 +183,8 @@ button:hover { background: #f0f0f0; }
   line-height: 1.3;
   margin-bottom: 16px;
   padding-left: 10px;
-  border-left: 4px solid #ccc;     /* colour is set inline to match the member's lin */
-  padding-right: 28px;             /* avoid overlap with the × close button */
+  border-left: 4px solid #ccc;
+  padding-right: 28px;
 }
 
 .info-field   { margin-bottom: 13px; }
@@ -230,26 +198,48 @@ button:hover { background: #f0f0f0; }
 .info-value-row  { display: flex; align-items: center; gap: 8px; }
 .info-value      { font-size: 0.88rem; color: #222; word-break: break-word; }
 
-/* Copy-to-clipboard button (shown only for contact fields like email / phone) */
-.info-link       { color: #1a6eb5; text-decoration: none; word-break: break-all; }
-.info-link:hover { text-decoration: underline; }
+.info-link       { color: #8C1D2E; text-decoration: none; word-break: break-all; font-size: 0.88rem; }
+.info-link:hover { text-decoration: underline; color: #6B0F1F; }
 
-.copy-btn {
-  flex-shrink: 0;
-  background: none;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 0.7rem;
+/* Boxed copy field — entire row is the click target */
+.info-copy-box {
+  display: flex;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: white;
   cursor: pointer;
-  color: #666;
+  transition: border-color 0.15s;
 }
-.copy-btn:hover          { background: #f5f5f5; }
-.copy-btn.copied         { color: #27ae60; border-color: #27ae60; }  /* brief "Copied!" state */
+.info-copy-box:hover              { border-color: #C8943A; }
+.info-copy-box:hover .copy-icon   { background: #FEF3E2; color: #C8943A; }
+.info-copy-box.copied             { border-color: #27ae60; }
+.info-copy-box.copied .copy-icon  { background: #f0faf4; color: #27ae60; }
+
+.copy-icon {
+  width: 34px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border-right: 1px solid #e0e0e0;
+  color: #bbb;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.info-copy-value {
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  color: #222;
+  flex: 1;
+  word-break: break-all;
+  line-height: 1.45;
+}
 
 .info-divider { border: none; border-top: 1px solid #f0f0f0; margin: 16px 0; }
 
-/* Littles section inside the info panel */
+/* Littles section */
 .info-littles h3 {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -263,12 +253,49 @@ button:hover { background: #f0f0f0; }
   padding: 6px 0;
   border-bottom: 1px solid #f5f5f5;
   cursor: pointer;
-  color: #1a6eb5;
+  color: #8C1D2E;
 }
-.info-littles li:hover { color: #0d4d8a; text-decoration: underline; }
+.info-littles li:hover { color: #6B0F1F; text-decoration: underline; }
+
+/* ── Industry tag multi-select ──────────────────────────────────────────────── */
+.tag-select         { position: relative; display: inline-block; }
+.tag-select-trigger {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  border: 1px solid #ccc; border-radius: 5px; padding: 3px 8px;
+  min-width: 130px; max-width: 280px; min-height: 28px;
+  cursor: pointer; background: white; font-size: 0.8rem;
+}
+.tag-select-trigger:focus-within { border-color: #8C1D2E; }
+.tag-select-tags    { display: contents; }
+.tag-select-placeholder { color: #999; font-size: 0.8rem; }
+.tag-select-arrow   { margin-left: auto; color: #aaa; font-size: 0.65rem; padding-left: 4px; flex-shrink: 0; }
+.tag-select-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: #FEF3E2; border-radius: 3px;
+  padding: 1px 5px; font-size: 0.75rem; color: #6B0F1F; white-space: nowrap;
+  border: 1px solid #e8d0a0;
+}
+.tag-remove {
+  background: none; border: none; cursor: pointer;
+  color: #C8943A; font-size: 0.9rem; padding: 0; line-height: 1;
+}
+.tag-remove:hover { color: #8C1D2E; background: none; }
+.tag-select-dropdown {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0;
+  min-width: 100%; max-height: 220px; overflow-y: auto;
+  background: white; border: 1px solid #e8d0a0; border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(140,29,46,0.1); z-index: 500;
+}
+.tag-select-dropdown.open { display: block; }
+.tag-select-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; cursor: pointer; font-size: 0.8rem; color: #333;
+  white-space: nowrap; user-select: none;
+}
+.tag-select-item:hover { background: #FEF3E2; }
+.tag-select-item input[type="checkbox"] { cursor: pointer; margin: 0; flex-shrink: 0; accent-color: #8C1D2E; }
 
 /* ── Full-screen status screens ─────────────────────────────────────────────── */
-/* .screen is toggled by show() in main.js */
 .screen {
   display: none;
   align-items: center;
@@ -279,7 +306,6 @@ button:hover { background: #f0f0f0; }
 }
 #loading-screen { display: flex; color: #888; font-size: 0.95rem; }
 
-/* Card used by the setup and error screens */
 .card {
   background: white;
   border-radius: 10px;
@@ -299,9 +325,9 @@ button:hover { background: #f0f0f0; }
 }
 .card .note               { margin-top: 14px; font-size: 0.8rem; color: #999; }
 
-#setup-screen .card       { border-top: 4px solid #faad14; }
-#setup-screen h2          { color: #ad6800; }
+#setup-screen .card       { border-top: 4px solid #C8943A; }
+#setup-screen h2          { color: #8C1D2E; }
 
-#error-screen .card       { border-top: 4px solid #e74c3c; }
-#error-screen h2          { color: #c0392b; }
+#error-screen .card       { border-top: 4px solid #8C1D2E; }
+#error-screen h2          { color: #8C1D2E; }
 #error-msg                { margin-top: 8px; font-size: 0.88rem; color: #555; }

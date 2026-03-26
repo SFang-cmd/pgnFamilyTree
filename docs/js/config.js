@@ -59,7 +59,7 @@ export const PANEL_FIELDS = [
   { key: "location",       label: "Location",        copy: false             },
   { key: "non-penn_email", label: "Email",           copy: true              },
   { key: "phone_number",   label: "Phone",           copy: true              },
-  { key: "linkedin",       label: "LinkedIn",        copy: true, link: true  },
+  { key: "linkedin",       label: "LinkedIn",        copy: false, link: true  },
 ];
 
 // ---------------------------------------------------------------------------
