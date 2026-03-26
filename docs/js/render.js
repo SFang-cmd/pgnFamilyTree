@@ -77,6 +77,31 @@ export function render(members, { onNodeClick } = {}) {
     sel.appendChild(o);
   });
 
+  // Populate industry tag-select — split comma-separated values into checkboxes.
+  const industryVals = [...new Set(
+    members.flatMap(m => (m.industry || "").split(",").map(s => s.trim()).filter(Boolean))
+  )].sort();
+  const industryDropdown = document.getElementById("industry-dropdown");
+  industryVals.forEach(v => {
+    const lbl = document.createElement("label");
+    lbl.className = "tag-select-item";
+    lbl.innerHTML = `<input type="checkbox" value="${v}"> ${v}`;
+    industryDropdown.appendChild(lbl);
+  });
+
+  // Populate company / location dropdowns from member data.
+  const _populateDropdown = (elId, key) => {
+    const vals = [...new Set(members.map(m => (m[key] || "").trim()).filter(Boolean))].sort();
+    const el = document.getElementById(elId);
+    vals.forEach(v => {
+      const o = document.createElement("option");
+      o.value = v; o.textContent = v;
+      el.appendChild(o);
+    });
+  };
+  _populateDropdown("company-filter",  "current_company");
+  _populateDropdown("location-filter", "location");
+
   // Build the D3 hierarchy.  Throws if names are not unique or a cycle exists.
   currentRoot = d3.stratify()
     .id(d => d.name)

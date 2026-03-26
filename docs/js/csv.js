@@ -30,7 +30,9 @@ export function parseCSV(raw) {
   // Strip UTF-8 BOM character that Excel sometimes prepends.
   raw = raw.replace(/^\uFEFF/, "");
 
-  const lines = raw.trim().split(/\r?\n/);
+  // Split into records while respecting quoted fields that contain newlines.
+  // A plain raw.split(/\r?\n/) would break any field whose value spans lines.
+  const lines = _splitRecords(raw);
   if (lines.length < 2) return [];
 
   // Normalise headers to snake_case lower-case.
@@ -42,10 +44,43 @@ export function parseCSV(raw) {
     const vals = splitLine(line);
     const row  = {};
     headers.forEach((h, i) => {
-      row[h] = (vals[i] ?? "").trim();
+      // Collapse embedded newlines in values to a single space, then trim.
+      row[h] = (vals[i] ?? "").replace(/\r?\n/g, " ").trim();
     });
     return row;
   }).filter(r => r.name); // drop blank rows
+}
+
+/**
+ * Split raw CSV text into record strings, respecting quoted fields that
+ * may contain embedded newline characters.
+ *
+ * @param {string} raw
+ * @returns {string[]}
+ */
+function _splitRecords(raw) {
+  const records = [];
+  let cur = "";
+  let inQ = false;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '"') {
+      inQ = !inQ;
+      cur += ch;
+    } else if (!inQ && ch === "\r") {
+      if (raw[i + 1] === "\n") i++;
+      records.push(cur);
+      cur = "";
+    } else if (!inQ && ch === "\n") {
+      records.push(cur);
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.trim()) records.push(cur);
+  return records;
 }
 
 /**

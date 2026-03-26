@@ -18,7 +18,21 @@
 
 <div id="controls">
   <label>Search <input type="text" id="search" placeholder="Member name…" autocomplete="off"></label>
-  <label>Lin <select id="lin-filter"><option value="">All lins</option></select></label>
+  <label>Lin      <select id="lin-filter">     <option value="">All lins</option></select></label>
+  <label>Industry
+    <div class="tag-select" id="industry-select">
+      <div class="tag-select-trigger" id="industry-trigger">
+        <div class="tag-select-tags" id="industry-tags"></div>
+        <span class="tag-select-placeholder" id="industry-placeholder">All industries</span>
+        <span class="tag-select-arrow">▾</span>
+      </div>
+      <div class="tag-select-dropdown" id="industry-dropdown"></div>
+    </div>
+  </label>
+  <label>Company  <select id="company-filter"> <option value="">All companies</option></select></label>
+  <label>Location <select id="location-filter"><option value="">All locations</option></select></label>
+  <label><input type="checkbox" id="has-email">    Has email</label>
+  <label><input type="checkbox" id="has-linkedin"> Has LinkedIn</label>
   <label>Layout
     <select id="layout-mode">
       <option value="none">No layering</option>

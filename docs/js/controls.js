@@ -3,18 +3,24 @@
  * ====================
  * Wires all interactive UI controls to their render/panel handlers.
  *
- * Responsibilities:
- *   - Search input   → highlight/dim matching nodes
- *   - Lin filter     → dim nodes not in the selected lin
- *   - Color toggle   → enable/disable lin colouring on nodes
- *   - Fit button     → call fitTree()
- *   - Panel close    → #info-close button, SVG background click, Escape key
+ * All active filters are ANDed together: a node is dimmed if it fails
+ * ANY active filter.  _applyFilters() is the single place where dimming
+ * is computed so filters never overwrite each other.
  *
- * This module has no mutable state of its own — it only attaches event
- * listeners and delegates to render.js / panel.js.
+ * Responsibilities:
+ *   - Search input        → highlight/dim by name
+ *   - Lin filter          → dim nodes not in the selected lin
+ *   - Industry filter     → dim nodes not in the selected industry
+ *   - Company filter      → dim nodes not in the selected company
+ *   - Location filter     → dim nodes not in the selected location
+ *   - Has-email checkbox  → dim nodes with no email
+ *   - Has-LinkedIn checkbox → dim nodes with no LinkedIn
+ *   - Color toggle        → enable/disable lin colouring on nodes
+ *   - Fit button          → call fitTree()
+ *   - Panel close         → #info-close button, SVG background click, Escape key
  *
  * Dependencies:
- *   - render.js — fitTree(), setColorOn(), getColorOn()
+ *   - render.js — fitTree(), setColorOn(), getColorOn(), setLayoutMode()
  *   - panel.js  — closePanel()
  *   - D3 v7 loaded as a global <script> in index.html
  */
@@ -23,20 +29,33 @@ import { fitTree, setColorOn, getColorOn, setLayoutMode } from "./render.js";
 import { closePanel } from "./panel.js";
 
 // ---------------------------------------------------------------------------
+// Active filter state — all ANDed together in _applyFilters()
+// ---------------------------------------------------------------------------
+
+let _searchQuery    = "";
+let _linFilter      = "";
+let _industryFilter = [];   // array — multi-select
+let _companyFilter  = "";
+let _locationFilter = "";
+let _hasEmail       = false;
+let _hasLinkedin    = false;
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Attach all event listeners for the control bar and panel close gestures.
- *
- * Call this once after the tree has been rendered.  It is safe to call
- * multiple times (each call replaces the previous listener via the DOM's
- * single-listener model for directly-set handlers, but the addEventListener
- * calls may stack — call only once in practice).
+ * Call once after the tree has been rendered.
  */
 export function setupControls() {
   _setupSearch();
   _setupLinFilter();
+  _setupIndustryFilter();
+  _setupCompanyFilter();
+  _setupLocationFilter();
+  _setupHasEmail();
+  _setupHasLinkedin();
   _setupLayoutMode();
   _setupColorToggle();
   _setupFitButton();
@@ -44,71 +63,145 @@ export function setupControls() {
 }
 
 // ---------------------------------------------------------------------------
-// Private helpers — one function per control group
+// Shared filter engine
 // ---------------------------------------------------------------------------
 
 /**
- * Search box: highlight nodes whose name contains the query; dim the rest.
- * Clearing the query removes all highlights/dims.
+ * Apply all active filters simultaneously.
+ * A node is dimmed if it fails any active filter.
+ * A node is highlighted only when the name search matches.
  */
+function _applyFilters() {
+  d3.selectAll(".node")
+    .classed("highlighted", d =>
+      !!_searchQuery && d.data.name.toLowerCase().includes(_searchQuery))
+    .classed("dimmed", d => {
+      if (_searchQuery    && !d.data.name.toLowerCase().includes(_searchQuery)) return true;
+      if (_linFilter      && d.data._lin !== _linFilter)                        return true;
+      if (_industryFilter.length) {
+        const memberIndustries = (d.data.industry || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (!_industryFilter.some(sel => memberIndustries.includes(sel))) return true;
+      }
+      if (_companyFilter  && (d.data.current_company  || "").trim() !== _companyFilter)  return true;
+      if (_locationFilter && (d.data.location         || "").trim() !== _locationFilter) return true;
+      if (_hasEmail       && !(d.data["non-penn_email"] || "").trim())                   return true;
+      if (_hasLinkedin    && !(d.data.linkedin          || "").trim())                   return true;
+      return false;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers — one function per control group
+// ---------------------------------------------------------------------------
+
 function _setupSearch() {
   document.getElementById("search").addEventListener("input", function () {
-    const q = this.value.toLowerCase().trim();
-    d3.selectAll(".node")
-      .classed("highlighted", d => q !== "" && d.data.name.toLowerCase().includes(q))
-      .classed("dimmed",      d => q !== "" && !d.data.name.toLowerCase().includes(q));
+    _searchQuery = this.value.toLowerCase().trim();
+    _applyFilters();
   });
 }
 
-/**
- * Lin filter dropdown: dim all nodes that don't belong to the selected lin.
- * Selecting "All lins" (empty value) removes all dims.
- * Also clears the search input so both filters don't conflict.
- */
 function _setupLinFilter() {
   document.getElementById("lin-filter").addEventListener("change", function () {
-    const v = this.value;
-    d3.selectAll(".node")
-      .classed("dimmed",      d => v !== "" && d.data._lin !== v)
-      .classed("highlighted", false);
-    document.getElementById("search").value = "";
+    _linFilter = this.value;
+    _applyFilters();
   });
 }
 
-/**
- * Layout mode dropdown: switches between no layering and class-year rows.
- */
+function _setupIndustryFilter() {
+  const select      = document.getElementById("industry-select");
+  const trigger     = document.getElementById("industry-trigger");
+  const dropdown    = document.getElementById("industry-dropdown");
+  const tagsEl      = document.getElementById("industry-tags");
+  const placeholder = document.getElementById("industry-placeholder");
+
+  // Toggle dropdown open/close on trigger click.
+  trigger.addEventListener("click", e => {
+    e.stopPropagation();
+    dropdown.classList.toggle("open");
+  });
+
+  // Prevent clicks inside the dropdown from bubbling to the document handler.
+  dropdown.addEventListener("click", e => e.stopPropagation());
+
+  // Close dropdown when clicking anywhere outside the component.
+  document.addEventListener("click", () => dropdown.classList.remove("open"));
+
+  // Checkbox changes → update tags and filter.
+  dropdown.addEventListener("change", () => _syncIndustryTags(tagsEl, placeholder, dropdown));
+}
+
+function _syncIndustryTags(tagsEl, placeholder, dropdown) {
+  _industryFilter = Array.from(dropdown.querySelectorAll("input:checked")).map(i => i.value);
+
+  // Re-render tags.
+  tagsEl.innerHTML = "";
+  _industryFilter.forEach(val => {
+    const tag = document.createElement("span");
+    tag.className = "tag-select-tag";
+    tag.innerHTML = `${val}<button class="tag-remove" data-val="${val}">&times;</button>`;
+    tagsEl.appendChild(tag);
+  });
+
+  placeholder.style.display = _industryFilter.length ? "none" : "";
+
+  // Wire × buttons — uncheck the box and sync again.
+  tagsEl.querySelectorAll(".tag-remove").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const cb = dropdown.querySelector(`input[value="${btn.dataset.val}"]`);
+      if (cb) cb.checked = false;
+      _syncIndustryTags(tagsEl, placeholder, dropdown);
+    });
+  });
+
+  _applyFilters();
+}
+
+function _setupCompanyFilter() {
+  document.getElementById("company-filter").addEventListener("change", function () {
+    _companyFilter = this.value;
+    _applyFilters();
+  });
+}
+
+function _setupLocationFilter() {
+  document.getElementById("location-filter").addEventListener("change", function () {
+    _locationFilter = this.value;
+    _applyFilters();
+  });
+}
+
+function _setupHasEmail() {
+  document.getElementById("has-email").addEventListener("change", function () {
+    _hasEmail = this.checked;
+    _applyFilters();
+  });
+}
+
+function _setupHasLinkedin() {
+  document.getElementById("has-linkedin").addEventListener("change", function () {
+    _hasLinkedin = this.checked;
+    _applyFilters();
+  });
+}
+
 function _setupLayoutMode() {
   document.getElementById("layout-mode").addEventListener("change", function () {
     setLayoutMode(this.value);
   });
 }
 
-/**
- * "Color by lin" checkbox: delegates to setColorOn() in render.js,
- * which updates node fill/stroke colours and hides/shows the legend.
- */
 function _setupColorToggle() {
   document.getElementById("color-toggle").addEventListener("change", function () {
     setColorOn(this.checked);
   });
 }
 
-/**
- * "Fit to screen" button: calls fitTree() from render.js to animate the
- * viewport back to a full-tree view.
- */
 function _setupFitButton() {
   document.getElementById("fit-btn").addEventListener("click", fitTree);
 }
 
-/**
- * Panel close gestures:
- *   - Clicking the × button inside the panel
- *   - Clicking the SVG background (node clicks call stopPropagation, so only
- *     background clicks bubble up to this listener)
- *   - Pressing the Escape key anywhere on the page
- */
 function _setupPanelClose() {
   document.getElementById("info-close").addEventListener("click", closePanel);
   document.getElementById("tree-svg").addEventListener("click", closePanel);

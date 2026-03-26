@@ -49,11 +49,17 @@ export const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQuaKQ
  * @type {Array<{key: string, label: string, copy: boolean}>}
  */
 export const PANEL_FIELDS = [
-  { key: "pledge_class", label: "Pledge Class", copy: false },
-  { key: "class_year",   label: "Class Year",   copy: false },
-  { key: "big",          label: "Big",           copy: false },
-  { key: "email",        label: "Email",         copy: true  },
-  // { key: "phone",     label: "Phone",          copy: true  },
+  { key: "pledge_class",   label: "Pledge Class",    copy: false             },
+  { key: "class_year",     label: "Class Year",      copy: false             },
+  { key: "big",            label: "Big",             copy: false             },
+  { key: "role",           label: "Role",            copy: false             },
+  { key: "current_company",label: "Current Company", copy: false             },
+  { key: "past_companies", label: "Past Companies",  copy: false             },
+  { key: "industry",       label: "Industry",        copy: false             },
+  { key: "location",       label: "Location",        copy: false             },
+  { key: "non-penn_email", label: "Email",           copy: true              },
+  { key: "phone_number",   label: "Phone",           copy: true              },
+  { key: "linkedin",       label: "LinkedIn",        copy: true, link: true  },
 ];
 
 // ---------------------------------------------------------------------------

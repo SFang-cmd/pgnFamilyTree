@@ -43,10 +43,14 @@ export function openPanel(d) {
     const val = (d.data[field.key] || "").trim();
     if (!val) continue;
 
+    const displayVal = field.link
+      ? `<a class="info-value info-link" href="${_escAttr(val.startsWith("http") ? val : "https://" + val)}" target="_blank" rel="noopener">${val}</a>`
+      : `<span class="info-value">${val}</span>`;
+
     html += `<div class="info-field">
       <div class="info-label">${field.label}</div>
       <div class="info-value-row">
-        <span class="info-value">${val}</span>
+        ${displayVal}
         ${field.copy
           ? `<button class="copy-btn" data-val="${_escAttr(val)}">Copy</button>`
           : ""}
