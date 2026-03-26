@@ -81,6 +81,20 @@ button:hover { background: #f0f0f0; }
 .node.highlighted rect     { stroke: #e74c3c !important; stroke-width: 2.5 !important; }
 .node.dimmed               { opacity: 0.12; }
 
+/* ── Class-year row underlays ───────────────────────────────────────────────── */
+.row-line {
+  stroke: #e8e8e8;
+  stroke-width: 1;
+  pointer-events: none;
+}
+.row-label {
+  font-size: 11px;
+  fill: #bbb;
+  dominant-baseline: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Hover tooltip ──────────────────────────────────────────────────────────── */
 #tooltip {
   position: fixed;

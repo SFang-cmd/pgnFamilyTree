@@ -41,6 +41,12 @@ let layoutMode = "none";
 /** @type {Map<string,Array<{x:number,y:number}>>|null} Waypoints keyed "srcId::tgtId". */
 let _edgeWaypoints = null;
 
+/** @type {Array<{year:string, y:number}>} Row y positions for class_year underlay. */
+let _rowYears = [];
+
+/** @type {d3.Selection|null} SVG group for viewport-fixed year labels (outside `g`). */
+let _labelsG = null;
+
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -87,10 +93,16 @@ export function render(members, { onNodeClick } = {}) {
 
   zoom = d3.zoom()
     .scaleExtent([0.05, 3])
-    .on("zoom", e => g.attr("transform", e.transform));
+    .on("zoom", e => {
+      g.attr("transform", e.transform);
+      _updateRowLabelPositions(e.transform);
+    });
   svg.call(zoom);
 
   g = svg.append("g");
+  _labelsG = svg.append("g").attr("class", "row-labels").attr("pointer-events", "none");
+
+  _updateRowUnderlays();
 
   // Draw curved links (skip edges from the hidden virtual root).
   g.selectAll(".link")
@@ -302,6 +314,7 @@ export function setLayoutMode(mode) {
   layoutMode = mode;
   if (!currentRoot) return;
   _computeLayout(currentRoot);
+  _updateRowUnderlays();
   g.selectAll(".node").transition().duration(350)
     .attr("transform", d => `translate(${d.x},${d.y})`);
   g.selectAll(".link").transition().duration(350)
@@ -394,6 +407,9 @@ function _computeLayout(root) {
       d.y = (vr.get(d.id) ?? (d.depth * 2)) * RANK_H;
     });
 
+    // Store row y positions for the underlay (lines + labels).
+    _rowYears = years.map((yr, i) => ({ year: String(yr), y: (i + 1) * 2 * RANK_H }));
+
     // Dummy positions: x from Dagre, y interpolated between source/target final y.
     const byId = new Map(root.descendants().map(d => [d.id, d]));
     _edgeWaypoints = new Map();
@@ -411,6 +427,7 @@ function _computeLayout(root) {
     });
 
   } else {
+    _rowYears = [];
     root.links()
       .filter(l => l.source.id !== VROOT && l.target.id !== VROOT)
       .forEach(l => dg.setEdge(l.source.id, l.target.id));
@@ -420,6 +437,46 @@ function _computeLayout(root) {
       if (pos) { d.x = pos.x; d.y = pos.y; }
     });
   }
+}
+
+/**
+ * Draw (or clear) horizontal row lines and year labels.
+ * Lines live inside `g` so they zoom/pan with the tree.
+ * Labels live in `_labelsG` (outside `g`) so they stay fixed to the viewport.
+ */
+function _updateRowUnderlays() {
+  g.selectAll(".row-underlays").remove();
+  if (_labelsG) _labelsG.selectAll(".row-label").remove();
+  if (!_rowYears.length) return;
+
+  const ul = g.insert("g", ":first-child").attr("class", "row-underlays");
+  ul.selectAll("line")
+    .data(_rowYears)
+    .join("line")
+    .attr("class", "row-line")
+    .attr("x1", -5000).attr("x2", 5000)
+    .attr("y1", d => d.y).attr("y2", d => d.y);
+
+  if (_labelsG) {
+    _labelsG.selectAll(".row-label")
+      .data(_rowYears)
+      .join("text")
+      .attr("class", "row-label")
+      .attr("x", 8)
+      .text(d => d.year);
+    _updateRowLabelPositions(d3.zoomTransform(svg.node()));
+  }
+}
+
+/**
+ * Sync label y positions to the current zoom transform.
+ * Called on every zoom event and whenever underlays are redrawn.
+ * @param {d3.ZoomTransform} transform
+ */
+function _updateRowLabelPositions(transform) {
+  if (!_labelsG) return;
+  _labelsG.selectAll(".row-label")
+    .attr("y", d => d.y * transform.k + transform.y);
 }
 
 /**
