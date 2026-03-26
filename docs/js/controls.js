@@ -19,7 +19,7 @@
  *   - D3 v7 loaded as a global <script> in index.html
  */
 
-import { fitTree, setColorOn, getColorOn } from "./render.js";
+import { fitTree, setColorOn, getColorOn, setLayoutMode } from "./render.js";
 import { closePanel } from "./panel.js";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +37,7 @@ import { closePanel } from "./panel.js";
 export function setupControls() {
   _setupSearch();
   _setupLinFilter();
+  _setupLayoutMode();
   _setupColorToggle();
   _setupFitButton();
   _setupPanelClose();
@@ -71,6 +72,15 @@ function _setupLinFilter() {
       .classed("dimmed",      d => v !== "" && d.data._lin !== v)
       .classed("highlighted", false);
     document.getElementById("search").value = "";
+  });
+}
+
+/**
+ * Layout mode dropdown: switches between no layering and class-year rows.
+ */
+function _setupLayoutMode() {
+  document.getElementById("layout-mode").addEventListener("change", function () {
+    setLayoutMode(this.value);
   });
 }
 

@@ -35,6 +35,13 @@ let currentRoot = null;
 /** @type {boolean} Whether lin colours are currently applied to nodes. */
 let colorOn = true;
 
+/** @type {string} Current layout mode: "none" | "class_year" | "pledge_class" */
+let layoutMode = "none";
+
+/** @type {Map<string,Array<{x:number,y:number}>>|null} Waypoints keyed "srcId::tgtId". */
+let _edgeWaypoints = null;
+
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -69,63 +76,10 @@ export function render(members, { onNodeClick } = {}) {
     .id(d => d.name)
     .parentId(d => d._parent)(nodes);
 
-  // Apply tree layout — nodeSize gives uniform spacing regardless of tree width.
-  d3.tree().nodeSize([NODE_W + 6, NODE_H + 52])(currentRoot);
-
-  // Override each node's y-coordinate so members of the same graduation year
-  // land on the same horizontal row.  Nodes without a class_year (placeholder
-  // members whose data is incomplete) keep the depth-based y from d3.tree().
-  const ROW_H = 90; // vertical pixels between consecutive class years
-  const years = [...new Set(
-    currentRoot.descendants()
-      .map(d => d.data.class_year)
-      .filter(y => y && y !== "-")
-      .map(y => parseInt(y, 10))
-      .filter(y => !isNaN(y))
-  )].sort((a, b) => a - b);
-
-  const yearToY = new Map(years.map((y, i) => [String(y), i * ROW_H]));
-
-  currentRoot.descendants().forEach(d => {
-    const mapped = yearToY.get(d.data.class_year);
-    if (mapped !== undefined) d.y = mapped;
-  });
-
-  // Second pass (top-down): when a little's y is at or above their big's y
-  // (same class year, or a cascading chain of same-year bigs), drop them 50px
-  // below the big.  Using <= instead of === means the correction cascades:
-  // if A→B→C are all the same year, B is shifted first, then C is checked
-  // against the already-shifted B and shifted again.
-  currentRoot.eachBefore(d => {
-    if (d.parent && d.y <= d.parent.y) {
-      d.y = d.parent.y + 50;
-    }
-  });
-
-  // Third pass: the y-override can bring nodes from different tree depths onto
-  // the same row, creating overlaps D3 didn't plan for.  For each y level,
-  // sort nodes by their parent's x first (so siblings of the same parent stay
-  // grouped together and can't be split by nodes from an unrelated branch),
-  // then do a single left-to-right sweep to push apart any that are too close.
-  const byLevel = new Map();
-  currentRoot.descendants().filter(d => d.id !== VROOT).forEach(d => {
-    const k = Math.round(d.y);
-    if (!byLevel.has(k)) byLevel.set(k, []);
-    byLevel.get(k).push(d);
-  });
-  const minSlot = NODE_W + 6;
-  byLevel.forEach(nodes => {
-    if (nodes.length < 2) return;
-    nodes.sort((a, b) => {
-      const pa = a.parent ? a.parent.x : a.x;
-      const pb = b.parent ? b.parent.x : b.x;
-      return pa !== pb ? pa - pb : a.x - b.x;
-    });
-    for (let i = 1; i < nodes.length; i++) {
-      const minX = nodes[i - 1].x + minSlot;
-      if (nodes[i].x < minX) nodes[i].x = minX;
-    }
-  });
+  // Compute x,y positions via Dagre (Graphviz's Sugiyama algorithm in JS).
+  // d3.stratify() above builds the hierarchy for rendering; Dagre computes
+  // the actual coordinates.
+  _computeLayout(currentRoot);
 
   // Initialise SVG and zoom behaviour.
   svg = d3.select("#tree-svg");
@@ -138,12 +92,13 @@ export function render(members, { onNodeClick } = {}) {
 
   g = svg.append("g");
 
-  // Draw curved links (skip edges originating from the hidden virtual root).
+  // Draw curved links (skip edges from the hidden virtual root).
   g.selectAll(".link")
     .data(currentRoot.links().filter(l => l.source.id !== VROOT))
     .join("path")
     .attr("class", "link")
-    .attr("d", d3.linkVertical().x(d => d.x).y(d => d.y));
+    .attr("d", l => _linkPath(l));
+
 
   // Draw node groups (skip the virtual root node itself).
   const nd = g.selectAll(".node")
@@ -334,3 +289,150 @@ function _moveTip(ev, tip) {
 export function clip(s, n) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
+
+/**
+ * Compute node positions: Dagre for x, class year for y.
+ * @param {d3.HierarchyNode} root
+ */
+/**
+ * Switch the layout mode and re-render positions in place.
+ * @param {string} mode - "none" | "class_year" | "pledge_class"
+ */
+export function setLayoutMode(mode) {
+  layoutMode = mode;
+  if (!currentRoot) return;
+  _computeLayout(currentRoot);
+  g.selectAll(".node").transition().duration(350)
+    .attr("transform", d => `translate(${d.x},${d.y})`);
+  g.selectAll(".link").transition().duration(350)
+    .attr("d", l => _linkPath(l));
+  fitTree();
+}
+
+/**
+ * Compute node positions via Dagre.
+ * - "none": pure Dagre, no y-override.
+ * - "class_year": Dagre with dummy nodes for multi-rank edges; y overridden by
+ *   class year; dummy positions stored for debug rendering and edge routing.
+ * @param {d3.HierarchyNode} root
+ */
+function _computeLayout(root) {
+  _edgeWaypoints = null;
+
+  const dg = new dagre.graphlib.Graph();
+  dg.setGraph({ rankdir: "TB", nodesep: 20, ranksep: 80, marginx: 0, marginy: 0 });
+  dg.setDefaultEdgeLabel(() => ({}));
+  root.descendants().filter(d => d.id !== VROOT)
+    .forEach(d => dg.setNode(d.id, { width: NODE_W, height: NODE_H }));
+
+  if (layoutMode === "class_year") {
+    // ── Doubled-rank strategy ──────────────────────────────────────────────
+    // Class years get EVEN ranks (2, 4, 6 …), leaving odd slots for
+    // same-year big/little pairs.  All y values are therefore exact multiples
+    // of RANK_H — no fractional offsets that confuse Dagre's x layout.
+    //
+    // VROOT is included in the Dagre graph at rank 0, connected to every
+    // lin-head via a minlen edge.  This anchors all disconnected lin
+    // components to the same global rank scale so Dagre's crossing-
+    // minimisation works across the whole tree.
+    const RANK_H = 60;   // pixels per rank (two ranks = one class-year gap)
+    const years = [...new Set(
+      root.descendants()
+        .map(d => d.data.class_year)
+        .filter(y => y && y !== "-")
+        .map(y => parseInt(y, 10))
+        .filter(y => !isNaN(y))
+    )].sort((a, b) => a - b);
+
+    // Even ranks start at 2 so VROOT can sit at 0.
+    const yearToBaseRank = new Map(years.map((y, i) => [String(y), (i + 1) * 2]));
+
+    // Pre-assign visual ranks top-down.
+    // Same-year big/little: child gets parent_rank + 1 (odd rank, half gap).
+    const vr = new Map([[VROOT, 0]]);
+    root.eachBefore(d => {
+      if (d.id === VROOT) return;
+      const base = yearToBaseRank.get(d.data.class_year) ?? ((d.depth + 1) * 2);
+      const pr   = vr.get(d.parent?.id) ?? 0;
+      vr.set(d.id, Math.max(base, pr + 1));
+    });
+
+    // Include VROOT so all lin families share one connected Dagre graph.
+    dg.setNode(VROOT, { width: 0, height: 0 });
+
+    const dummyChains = new Map();
+    root.links().forEach(l => {
+      const srcRank = vr.get(l.source.id) ?? 0;
+      const tgtRank = vr.get(l.target.id) ?? 0;
+      const gap     = Math.max(1, tgtRank - srcRank);
+
+      if (l.source.id === VROOT) {
+        // VROOT → lin-head: minlen enforces global rank without dummy nodes.
+        dg.setEdge(VROOT, l.target.id, { minlen: gap });
+      } else if (gap > 1) {
+        // Multi-rank hop: insert visible dummy nodes for debug + routing.
+        const dummies = Array.from({ length: gap - 1 }, (_, i) => {
+          const id = `__d_${l.source.id}_${l.target.id}_${i}`;
+          dg.setNode(id, { width: 8, height: 8 });
+          return id;
+        });
+        [l.source.id, ...dummies, l.target.id].forEach((_, i, arr) => {
+          if (i < arr.length - 1) dg.setEdge(arr[i], arr[i + 1]);
+        });
+        dummyChains.set(`${l.source.id}::${l.target.id}`, dummies);
+      } else {
+        dg.setEdge(l.source.id, l.target.id);
+      }
+    });
+
+    dagre.layout(dg);
+
+    // x from Dagre; y from pre-assigned visual rank (all integer multiples of RANK_H).
+    root.descendants().filter(d => d.id !== VROOT).forEach(d => {
+      const pos = dg.node(d.id);
+      if (pos) d.x = pos.x;
+      d.y = (vr.get(d.id) ?? (d.depth * 2)) * RANK_H;
+    });
+
+    // Dummy positions: x from Dagre, y interpolated between source/target final y.
+    const byId = new Map(root.descendants().map(d => [d.id, d]));
+    _edgeWaypoints = new Map();
+    dummyChains.forEach((dummies, key) => {
+      const [srcId, tgtId] = key.split("::");
+      const src = byId.get(srcId), tgt = byId.get(tgtId);
+      if (!src || !tgt) return;
+      const pts = dummies.map((id, i) => {
+        const pos = dg.node(id);
+        if (!pos) return null;
+        const t = (i + 1) / (dummies.length + 1);
+        return { x: pos.x, y: src.y + (tgt.y - src.y) * t };
+      }).filter(Boolean);
+      if (pts.length) _edgeWaypoints.set(key, pts);
+    });
+
+  } else {
+    root.links()
+      .filter(l => l.source.id !== VROOT && l.target.id !== VROOT)
+      .forEach(l => dg.setEdge(l.source.id, l.target.id));
+    dagre.layout(dg);
+    root.descendants().filter(d => d.id !== VROOT).forEach(d => {
+      const pos = dg.node(d.id);
+      if (pos) { d.x = pos.x; d.y = pos.y; }
+    });
+  }
+}
+
+/**
+ * Return the SVG path `d` for a link, routing through waypoints when available.
+ * @param {d3.HierarchyLink} l
+ * @returns {string}
+ */
+function _linkPath(l) {
+  const wps = _edgeWaypoints?.get(`${l.source.id}::${l.target.id}`) ?? [];
+  if (!wps.length) {
+    return d3.linkVertical().x(d => d.x).y(d => d.y)({ source: l.source, target: l.target });
+  }
+  const pts = [{ x: l.source.x, y: l.source.y }, ...wps, { x: l.target.x, y: l.target.y }];
+  return d3.line().x(p => p.x).y(p => p.y).curve(d3.curveMonotoneY)(pts);
+}
+
