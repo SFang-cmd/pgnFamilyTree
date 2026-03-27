@@ -36,7 +36,7 @@ let currentRoot = null;
 let colorOn = true;
 
 /** @type {string} Current layout mode: "none" | "class_year" | "pledge_class" */
-let layoutMode = "none";
+let layoutMode = "class_year";
 
 /** @type {Map<string,Array<{x:number,y:number}>>|null} Waypoints keyed "srcId::tgtId". */
 let _edgeWaypoints = null;

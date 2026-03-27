@@ -25,7 +25,7 @@
  *   - D3 v7 loaded as a global <script> in index.html
  */
 
-import { fitTree, setColorOn, getColorOn, setLayoutMode } from "./render.js";
+import { fitTree, setColorOn, setLayoutMode } from "./render.js";
 import { closePanel } from "./panel.js";
 
 // ---------------------------------------------------------------------------
@@ -56,10 +56,13 @@ export function setupControls() {
   _setupLocationFilter();
   _setupHasEmail();
   _setupHasLinkedin();
+  _setupClearFilters();
   _setupLayoutMode();
   _setupColorToggle();
   _setupFitButton();
   _setupPanelClose();
+  _setupControlsToggle();
+  _setupLegendToggle();
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +91,21 @@ function _applyFilters() {
       if (_hasLinkedin    && !(d.data.linkedin          || "").trim())                   return true;
       return false;
     });
+
+  // Show "Clear" button only when at least one filter is active.
+  const count = [_searchQuery, _linFilter, _companyFilter, _locationFilter]
+                  .filter(Boolean).length
+                + _industryFilter.length
+                + (_hasEmail ? 1 : 0)
+                + (_hasLinkedin ? 1 : 0);
+  document.getElementById("clear-filters").style.display = count ? "" : "none";
+
+  // Update filter badge on the mobile controls toggle.
+  const badge = document.getElementById("active-filter-count");
+  if (badge) {
+    badge.textContent = count || "";
+    badge.style.display = count ? "inline-flex" : "none";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +127,6 @@ function _setupLinFilter() {
 }
 
 function _setupIndustryFilter() {
-  const select      = document.getElementById("industry-select");
   const trigger     = document.getElementById("industry-trigger");
   const dropdown    = document.getElementById("industry-dropdown");
   const tagsEl      = document.getElementById("industry-tags");
@@ -186,6 +203,33 @@ function _setupHasLinkedin() {
   });
 }
 
+function _setupClearFilters() {
+  document.getElementById("clear-filters").addEventListener("click", () => {
+    // Reset state.
+    _searchQuery = ""; _linFilter = ""; _industryFilter = [];
+    _companyFilter = ""; _locationFilter = "";
+    _hasEmail = false; _hasLinkedin = false;
+
+    // Reset UI controls.
+    document.getElementById("search").value = "";
+    document.getElementById("lin-filter").value = "";
+    document.getElementById("company-filter").value = "";
+    document.getElementById("location-filter").value = "";
+    document.getElementById("has-email").checked = false;
+    document.getElementById("has-linkedin").checked = false;
+
+    // Reset industry tag-select.
+    const dropdown    = document.getElementById("industry-dropdown");
+    const tagsEl      = document.getElementById("industry-tags");
+    const placeholder = document.getElementById("industry-placeholder");
+    dropdown.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+    tagsEl.innerHTML = "";
+    placeholder.style.display = "";
+
+    _applyFilters();
+  });
+}
+
 function _setupLayoutMode() {
   document.getElementById("layout-mode").addEventListener("change", function () {
     setLayoutMode(this.value);
@@ -200,6 +244,26 @@ function _setupColorToggle() {
 
 function _setupFitButton() {
   document.getElementById("fit-btn").addEventListener("click", fitTree);
+}
+
+function _setupControlsToggle() {
+  const btn     = document.getElementById("controls-toggle");
+  const content = document.getElementById("controls-content");
+  btn.addEventListener("click", () => {
+    const collapsed = content.classList.toggle("collapsed");
+    btn.classList.toggle("collapsed", collapsed);
+  });
+}
+
+function _setupLegendToggle() {
+  const btn     = document.getElementById("legend-toggle");
+  const items   = document.getElementById("legend-items");
+  const chevron = btn.querySelector(".legend-chevron");
+  btn.addEventListener("click", () => {
+    const collapsed = items.classList.toggle("collapsed");
+    chevron.style.transform = collapsed ? "rotate(90deg)" : "";
+    btn.setAttribute("aria-expanded", String(!collapsed));
+  });
 }
 
 function _setupPanelClose() {

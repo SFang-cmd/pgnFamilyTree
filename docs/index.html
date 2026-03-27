@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PGN Family Tree</title>
-  <!-- D3 and Dagre must be loaded before ES modules so they are available as globals. -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
   <link rel="stylesheet" href="css/styles.css">
@@ -17,31 +16,84 @@
 </div>
 
 <div id="controls">
-  <label>Search <input type="text" id="search" placeholder="Member name…" autocomplete="off"></label>
-  <label>Lin      <select id="lin-filter">     <option value="">All lins</option></select></label>
-  <label>Industry
-    <div class="tag-select" id="industry-select">
-      <div class="tag-select-trigger" id="industry-trigger">
-        <div class="tag-select-tags" id="industry-tags"></div>
-        <span class="tag-select-placeholder" id="industry-placeholder">All industries</span>
-        <span class="tag-select-arrow">▾</span>
-      </div>
-      <div class="tag-select-dropdown" id="industry-dropdown"></div>
+
+  <!-- Mobile-only toggle row -->
+  <button id="controls-toggle">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6"  x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+    Filters
+    <span id="active-filter-count" class="filter-badge"></span>
+    <span class="ctrl-chevron">▾</span>
+  </button>
+
+  <!-- All controls — display:contents on desktop so items flow directly into #controls flex -->
+  <div id="controls-content">
+
+    <!-- Group 1: View controls -->
+    <div class="ctrl-item">
+      <span class="ctrl-label">Search</span>
+      <input type="text" id="search" placeholder="Name…" autocomplete="off">
     </div>
-  </label>
-  <label>Company  <select id="company-filter"> <option value="">All companies</option></select></label>
-  <label>Location <select id="location-filter"><option value="">All locations</option></select></label>
-  <label><input type="checkbox" id="has-email">    Has email</label>
-  <label><input type="checkbox" id="has-linkedin"> Has LinkedIn</label>
-  <label>Layout
-    <select id="layout-mode">
-      <option value="none">No layering</option>
-      <option value="class_year">Layer by class year</option>
-      <option value="pledge_class" disabled>Layer by pledge class (coming soon)</option>
-    </select>
-  </label>
-  <label><input type="checkbox" id="color-toggle" checked> Color by lin</label>
-  <button id="fit-btn">Fit to screen</button>
+    <div class="ctrl-item">
+      <span class="ctrl-label">Lin</span>
+      <select id="lin-filter"><option value="">All</option></select>
+    </div>
+    <div class="ctrl-item">
+      <span class="ctrl-label">Layout</span>
+      <select id="layout-mode">
+        <option value="none">No layering</option>
+        <option value="class_year" selected>By class year</option>
+        <option value="pledge_class" disabled>By pledge class (soon)</option>
+      </select>
+    </div>
+    <label class="ctrl-toggle">
+      <input type="checkbox" id="color-toggle" checked>
+      <span class="toggle-track"></span>
+      <span class="toggle-text">Color by lin</span>
+    </label>
+    <button id="fit-btn">Fit to screen</button>
+
+    <div class="ctrl-sep"></div>
+
+    <!-- Group 2: People filters -->
+    <div class="ctrl-item">
+      <span class="ctrl-label">Industry</span>
+      <div class="tag-select" id="industry-select">
+        <div class="tag-select-trigger" id="industry-trigger">
+          <div class="tag-select-tags" id="industry-tags"></div>
+          <span class="tag-select-placeholder" id="industry-placeholder">All</span>
+          <span class="tag-select-arrow">▾</span>
+        </div>
+        <div class="tag-select-dropdown" id="industry-dropdown"></div>
+      </div>
+    </div>
+    <div class="ctrl-item">
+      <span class="ctrl-label">Company</span>
+      <select id="company-filter"><option value="">All</option></select>
+    </div>
+    <div class="ctrl-item">
+      <span class="ctrl-label">Location</span>
+      <select id="location-filter"><option value="">All</option></select>
+    </div>
+
+    <div class="ctrl-sep"></div>
+
+    <!-- Group 3: Presence filters -->
+    <label class="ctrl-toggle">
+      <input type="checkbox" id="has-email">
+      <span class="toggle-track"></span>
+      <span class="toggle-text">Has email</span>
+    </label>
+    <label class="ctrl-toggle">
+      <input type="checkbox" id="has-linkedin">
+      <span class="toggle-track"></span>
+      <span class="toggle-text">Has LinkedIn</span>
+    </label>
+
+    <button id="clear-filters" style="display:none">✕ Clear</button>
+
+  </div><!-- #controls-content -->
 </div>
 
 <div id="tree-container">
@@ -81,11 +133,15 @@
   <svg id="tree-svg"></svg>
 
   <div id="legend">
-    <h4>Lin Legend</h4>
+    <button id="legend-toggle" aria-expanded="true">
+      <span>Lin Legend</span>
+      <span class="legend-chevron">▾</span>
+    </button>
     <div id="legend-items"></div>
   </div>
 
   <div id="info-panel">
+    <div id="panel-handle"></div>
     <button id="info-close">&times;</button>
     <div id="info-content"></div>
   </div>
@@ -93,11 +149,6 @@
 
 <div id="tooltip"></div>
 
-<!--
-  Entry point. type="module" enables ES module imports across all js/ files.
-  D3 is loaded above as a plain <script> so it remains a global (d3.*) that
-  all modules can reference without bundling.
--->
 <script type="module" src="js/main.js"></script>
 
 </body>
