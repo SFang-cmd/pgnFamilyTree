@@ -35,6 +35,7 @@ import { closePanel } from "./panel.js";
 let _searchQuery    = "";
 let _linFilter      = "";
 let _industryFilter = [];   // array — multi-select
+let _roleFilter     = [];   // array — multi-select
 let _companyFilter  = "";
 let _locationFilter = "";
 let _hasEmail       = false;
@@ -52,6 +53,7 @@ export function setupControls() {
   _setupSearch();
   _setupLinFilter();
   _setupIndustryFilter();
+  _setupRoleFilter();
   _setupCompanyFilter();
   _setupLocationFilter();
   _setupHasEmail();
@@ -85,6 +87,10 @@ function _applyFilters() {
         const memberIndustries = (d.data.industry || "").split(",").map(s => s.trim()).filter(Boolean);
         if (!_industryFilter.some(sel => memberIndustries.includes(sel))) return true;
       }
+      if (_roleFilter.length) {
+        const memberRoles = (d.data.role || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (!_roleFilter.some(sel => memberRoles.includes(sel))) return true;
+      }
       if (_companyFilter  && (d.data.current_company  || "").trim() !== _companyFilter)  return true;
       if (_locationFilter && (d.data.location         || "").trim() !== _locationFilter) return true;
       if (_hasEmail       && !(d.data["non-penn_email"] || "").trim())                   return true;
@@ -96,6 +102,7 @@ function _applyFilters() {
   const count = [_searchQuery, _linFilter, _companyFilter, _locationFilter]
                   .filter(Boolean).length
                 + _industryFilter.length
+                + _roleFilter.length
                 + (_hasEmail ? 1 : 0)
                 + (_hasLinkedin ? 1 : 0);
   document.getElementById("clear-filters").style.display = count ? "" : "none";
@@ -175,6 +182,47 @@ function _syncIndustryTags(tagsEl, placeholder, dropdown) {
   _applyFilters();
 }
 
+function _setupRoleFilter() {
+  const trigger     = document.getElementById("role-trigger");
+  const dropdown    = document.getElementById("role-dropdown");
+  const tagsEl      = document.getElementById("role-tags");
+  const placeholder = document.getElementById("role-placeholder");
+
+  trigger.addEventListener("click", e => {
+    e.stopPropagation();
+    dropdown.classList.toggle("open");
+  });
+
+  dropdown.addEventListener("click", e => e.stopPropagation());
+  document.addEventListener("click", () => dropdown.classList.remove("open"));
+  dropdown.addEventListener("change", () => _syncRoleTags(tagsEl, placeholder, dropdown));
+}
+
+function _syncRoleTags(tagsEl, placeholder, dropdown) {
+  _roleFilter = Array.from(dropdown.querySelectorAll("input:checked")).map(i => i.value);
+
+  tagsEl.innerHTML = "";
+  _roleFilter.forEach(val => {
+    const tag = document.createElement("span");
+    tag.className = "tag-select-tag";
+    tag.innerHTML = `${val}<button class="tag-remove" data-val="${val}">&times;</button>`;
+    tagsEl.appendChild(tag);
+  });
+
+  placeholder.style.display = _roleFilter.length ? "none" : "";
+
+  tagsEl.querySelectorAll(".tag-remove").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const cb = dropdown.querySelector(`input[value="${btn.dataset.val}"]`);
+      if (cb) cb.checked = false;
+      _syncRoleTags(tagsEl, placeholder, dropdown);
+    });
+  });
+
+  _applyFilters();
+}
+
 function _setupCompanyFilter() {
   document.getElementById("company-filter").addEventListener("change", function () {
     _companyFilter = this.value;
@@ -206,7 +254,7 @@ function _setupHasLinkedin() {
 function _setupClearFilters() {
   document.getElementById("clear-filters").addEventListener("click", () => {
     // Reset state.
-    _searchQuery = ""; _linFilter = ""; _industryFilter = [];
+    _searchQuery = ""; _linFilter = ""; _industryFilter = []; _roleFilter = [];
     _companyFilter = ""; _locationFilter = "";
     _hasEmail = false; _hasLinkedin = false;
 
@@ -225,6 +273,14 @@ function _setupClearFilters() {
     dropdown.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
     tagsEl.innerHTML = "";
     placeholder.style.display = "";
+
+    // Reset role tag-select.
+    const roleDropdown    = document.getElementById("role-dropdown");
+    const roleTags        = document.getElementById("role-tags");
+    const rolePlaceholder = document.getElementById("role-placeholder");
+    roleDropdown.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+    roleTags.innerHTML = "";
+    rolePlaceholder.style.display = "";
 
     _applyFilters();
   });

@@ -89,6 +89,18 @@ export function render(members, { onNodeClick } = {}) {
     industryDropdown.appendChild(lbl);
   });
 
+  // Populate role tag-select — split comma-separated values into checkboxes.
+  const roleVals = [...new Set(
+    members.flatMap(m => (m.role || "").split(",").map(s => s.trim()).filter(Boolean))
+  )].sort();
+  const roleDropdown = document.getElementById("role-dropdown");
+  roleVals.forEach(v => {
+    const lbl = document.createElement("label");
+    lbl.className = "tag-select-item";
+    lbl.innerHTML = `<input type="checkbox" value="${v}"> ${v}`;
+    roleDropdown.appendChild(lbl);
+  });
+
   // Populate company / location dropdowns from member data.
   const _populateDropdown = (elId, key) => {
     const vals = [...new Set(members.map(m => (m[key] || "").trim()).filter(Boolean))].sort();
