@@ -221,13 +221,9 @@ export function fitTree() {
   const x0   = Math.min(...xs) - NODE_W / 2, x1 = Math.max(...xs) + NODE_W / 2;
   const y0   = Math.min(...ys) - NODE_H / 2, y1 = Math.max(...ys) + NODE_H / 2;
 
-  // Fit to screen but never shrink below 0.25 — at that scale 14px font is
-  // still ~3.5px, which is enough to see the tree structure.  Users can zoom
-  // out further manually if they need the full picture.
-  const fitScale = Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.88;
-  const scale    = Math.max(0.25, Math.min(1, fitScale));
-  const tx       = W / 2 - ((x0 + x1) / 2) * scale;
-  const ty       = 24 - y0 * scale;
+  const scale = Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.92;
+  const tx    = W / 2 - ((x0 + x1) / 2) * scale;
+  const ty    = H / 2 - ((y0 + y1) / 2) * scale;
 
   svg.transition().duration(350)
     .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));

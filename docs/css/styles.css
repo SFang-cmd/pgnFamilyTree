@@ -36,11 +36,10 @@ body {
 #controls {
   background: white;
   border-bottom: 2px solid #e8d0a0;
-  padding: 8px 16px;
   display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   flex-shrink: 0;
 }
 
@@ -59,12 +58,12 @@ body {
   line-height: 1;
 }
 
-/* Vertical separator between groups */
+/* Separator between groups — full-width horizontal rule */
 .ctrl-sep {
-  width: 1px;
-  height: 30px;
+  width: 100%;
+  height: 1px;
   background: #e8d0a0;
-  margin: 0 2px;
+  margin: 2px 0;
 }
 
 /* Toggle switch */
@@ -403,14 +402,41 @@ input[type="text"]:focus, select:focus { border-color: #8C1D2E; box-shadow: 0 0 
 #error-screen h2          { color: #8C1D2E; }
 #error-msg                { margin-top: 8px; font-size: 0.88rem; color: #555; }
 
-/* ── Controls toggle (mobile hamburger row) ─────────────────────────────────── */
+/* ── Controls toggle — always visible ──────────────────────────────────────── */
 #controls-toggle {
-  display: none; /* shown only on mobile */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: white;
+  border: none;
+  border-radius: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+  cursor: pointer;
 }
-/* On desktop, controls-content is transparent — its children flow into #controls */
+#controls-toggle .ctrl-chevron {
+  margin-left: auto;
+  color: #aaa;
+  font-size: 1.1rem;
+  transition: transform 0.25s ease;
+  transform: rotate(0deg);   /* ▾ pointing down = expanded */
+}
+#controls-toggle.collapsed .ctrl-chevron { transform: rotate(90deg); }
+#controls-toggle:hover { background: #fafafa; color: #8C1D2E; }
+
+/* Expandable content area */
 #controls-content {
-  display: contents;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px 14px;
+  border-top: 1px solid #f0e8d8;
 }
+#controls-content.collapsed { display: none; }
 
 /* ── Filter badge (active filter count on mobile toggle) ────────────────────── */
 .filter-badge {
@@ -446,8 +472,13 @@ input[type="text"]:focus, select:focus { border-color: #8C1D2E; box-shadow: 0 0 
   margin-bottom: 8px;
 }
 #legend-toggle:hover { background: none; border: none; color: #6B0F1F; }
-.legend-chevron { transition: transform 0.2s; font-size: 0.65rem; }
-#legend-items.collapsed { display: none; }
+.legend-chevron { transition: transform 0.2s; font-size: 1rem; }
+#legend-items {
+  overflow: hidden;
+  max-height: 500px;
+  transition: max-height 0.2s ease;
+}
+#legend-items.collapsed { max-height: 0; }
 
 /* ── Panel drag handle (mobile only) ───────────────────────────────────────── */
 #panel-handle {
@@ -462,55 +493,6 @@ input[type="text"]:focus, select:focus { border-color: #8C1D2E; box-shadow: 0 0 
 
 /* ── Mobile layout ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-
-  /* Controls bar becomes a column; toggle button is the header row */
-  #controls {
-    padding: 0;
-    gap: 0;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  #controls-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 16px;
-    background: white;
-    border: none;
-    border-radius: 0;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #444;
-    cursor: pointer;
-  }
-  #controls-toggle .ctrl-chevron {
-    margin-left: auto;
-    color: #aaa;
-    transition: transform 0.25s ease;
-    transform: rotate(0deg);   /* ▾ pointing down = expanded */
-  }
-  #controls-toggle.collapsed .ctrl-chevron { transform: rotate(90deg); }
-  #controls-toggle:hover { background: #fafafa; color: #8C1D2E; }
-
-  /* Expandable content area */
-  #controls-content {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    padding: 10px 16px 14px;
-    border-top: 1px solid #f0e8d8;
-  }
-  #controls-content.collapsed { display: none; }
-
-  /* Separators go full-width on mobile to act as section dividers */
-  .ctrl-sep {
-    width: 100%;
-    height: 1px;
-    margin: 2px 0;
-  }
 
   /* Info panel becomes a bottom sheet */
   #info-panel {
