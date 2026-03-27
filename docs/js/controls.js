@@ -35,8 +35,9 @@ import { closePanel } from "./panel.js";
 let _searchQuery    = "";
 let _linFilter      = "";
 let _industryFilter = [];   // array — multi-select
-let _roleFilter     = [];   // array — multi-select
-let _companyFilter  = "";
+let _roleFilter        = [];   // array — multi-select
+let _companyFilter     = "";
+let _allCompanyFilter = [];   // array — multi-select
 let _locationFilter = "";
 let _hasEmail       = false;
 let _hasLinkedin    = false;
@@ -55,6 +56,7 @@ export function setupControls() {
   _setupIndustryFilter();
   _setupRoleFilter();
   _setupCompanyFilter();
+  _setupAllCompanyFilter();
   _setupLocationFilter();
   _setupHasEmail();
   _setupHasLinkedin();
@@ -77,10 +79,14 @@ export function setupControls() {
  * A node is highlighted only when the name search matches.
  */
 function _applyFilters() {
+  let visibleCount = 0;
+  let totalCount   = 0;
+
   d3.selectAll(".node")
     .classed("highlighted", d =>
       !!_searchQuery && d.data.name.toLowerCase().includes(_searchQuery))
     .classed("dimmed", d => {
+      totalCount++;
       if (_searchQuery    && !d.data.name.toLowerCase().includes(_searchQuery)) return true;
       if (_linFilter      && d.data._lin !== _linFilter)                        return true;
       if (_industryFilter.length) {
@@ -92,17 +98,35 @@ function _applyFilters() {
         if (!_roleFilter.some(sel => memberRoles.includes(sel))) return true;
       }
       if (_companyFilter  && (d.data.current_company  || "").trim() !== _companyFilter)  return true;
+      if (_allCompanyFilter.length) {
+        const allCompanies = [
+          ...(d.data.current_company || "").split(",").map(s => s.trim()).filter(Boolean),
+          ...(d.data.past_companies  || "").split(",").map(s => s.trim()).filter(Boolean),
+        ];
+        if (!_allCompanyFilter.some(sel => allCompanies.includes(sel))) return true;
+      }
       if (_locationFilter && (d.data.location         || "").trim() !== _locationFilter) return true;
       if (_hasEmail       && !(d.data["non-penn_email"] || "").trim())                   return true;
       if (_hasLinkedin    && !(d.data.linkedin          || "").trim())                   return true;
+      visibleCount++;
       return false;
     });
+
+  // Update member count display.
+  const memberCountEl = document.getElementById("member-count");
+  if (memberCountEl) {
+    const filtersActive = visibleCount < totalCount;
+    memberCountEl.textContent = filtersActive
+      ? `${visibleCount} / ${totalCount} members`
+      : `${totalCount} members`;
+  }
 
   // Show "Clear" button only when at least one filter is active.
   const count = [_searchQuery, _linFilter, _companyFilter, _locationFilter]
                   .filter(Boolean).length
                 + _industryFilter.length
                 + _roleFilter.length
+                + _allCompanyFilter.length
                 + (_hasEmail ? 1 : 0)
                 + (_hasLinkedin ? 1 : 0);
   document.getElementById("clear-filters").style.display = count ? "" : "none";
@@ -223,6 +247,47 @@ function _syncRoleTags(tagsEl, placeholder, dropdown) {
   _applyFilters();
 }
 
+function _setupAllCompanyFilter() {
+  const trigger     = document.getElementById("all-company-trigger");
+  const dropdown    = document.getElementById("all-company-dropdown");
+  const tagsEl      = document.getElementById("all-company-tags");
+  const placeholder = document.getElementById("all-company-placeholder");
+
+  trigger.addEventListener("click", e => {
+    e.stopPropagation();
+    dropdown.classList.toggle("open");
+  });
+
+  dropdown.addEventListener("click", e => e.stopPropagation());
+  document.addEventListener("click", () => dropdown.classList.remove("open"));
+  dropdown.addEventListener("change", () => _syncAllCompanyTags(tagsEl, placeholder, dropdown));
+}
+
+function _syncAllCompanyTags(tagsEl, placeholder, dropdown) {
+  _allCompanyFilter = Array.from(dropdown.querySelectorAll("input:checked")).map(i => i.value);
+
+  tagsEl.innerHTML = "";
+  _allCompanyFilter.forEach(val => {
+    const tag = document.createElement("span");
+    tag.className = "tag-select-tag";
+    tag.innerHTML = `${val}<button class="tag-remove" data-val="${val}">&times;</button>`;
+    tagsEl.appendChild(tag);
+  });
+
+  placeholder.style.display = _allCompanyFilter.length ? "none" : "";
+
+  tagsEl.querySelectorAll(".tag-remove").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const cb = dropdown.querySelector(`input[value="${btn.dataset.val}"]`);
+      if (cb) cb.checked = false;
+      _syncAllCompanyTags(tagsEl, placeholder, dropdown);
+    });
+  });
+
+  _applyFilters();
+}
+
 function _setupCompanyFilter() {
   document.getElementById("company-filter").addEventListener("change", function () {
     _companyFilter = this.value;
@@ -254,7 +319,7 @@ function _setupHasLinkedin() {
 function _setupClearFilters() {
   document.getElementById("clear-filters").addEventListener("click", () => {
     // Reset state.
-    _searchQuery = ""; _linFilter = ""; _industryFilter = []; _roleFilter = [];
+    _searchQuery = ""; _linFilter = ""; _industryFilter = []; _roleFilter = []; _allCompanyFilter = [];
     _companyFilter = ""; _locationFilter = "";
     _hasEmail = false; _hasLinkedin = false;
 
@@ -281,6 +346,14 @@ function _setupClearFilters() {
     roleDropdown.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
     roleTags.innerHTML = "";
     rolePlaceholder.style.display = "";
+
+    // Reset past company tag-select.
+    const pastDropdown    = document.getElementById("all-company-dropdown");
+    const pastTags        = document.getElementById("all-company-tags");
+    const pastPlaceholder = document.getElementById("all-company-placeholder");
+    pastDropdown.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+    pastTags.innerHTML = "";
+    pastPlaceholder.style.display = "";
 
     _applyFilters();
   });

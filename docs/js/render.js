@@ -101,6 +101,21 @@ export function render(members, { onNodeClick } = {}) {
     roleDropdown.appendChild(lbl);
   });
 
+  // Populate all-company tag-select — union of current and past companies.
+  const allCompanyVals = [...new Set(
+    members.flatMap(m => [
+      ...(m.current_company || "").split(",").map(s => s.trim()).filter(Boolean),
+      ...(m.past_companies  || "").split(",").map(s => s.trim()).filter(Boolean),
+    ])
+  )].sort();
+  const allCompanyDropdown = document.getElementById("all-company-dropdown");
+  allCompanyVals.forEach(v => {
+    const lbl = document.createElement("label");
+    lbl.className = "tag-select-item";
+    lbl.innerHTML = `<input type="checkbox" value="${v}"> ${v}`;
+    allCompanyDropdown.appendChild(lbl);
+  });
+
   // Populate company / location dropdowns from member data.
   const _populateDropdown = (elId, key) => {
     const vals = [...new Set(members.map(m => (m[key] || "").trim()).filter(Boolean))].sort();
